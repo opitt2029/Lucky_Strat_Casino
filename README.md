@@ -4,6 +4,14 @@
 
 本平台不涉及任何真實金錢交易，定位為社交娛樂遊戲平台。
 
+## Requirements
+
+- Docker
+- Docker Compose
+- Git
+
+> 目前本機環境已驗證 `docker-compose` 指令可解析設定；若使用 Docker Compose v2，也可以改用 `docker compose`。
+
 ## Tech Stack
 
 ### Frontend
@@ -39,7 +47,75 @@
 
 ```text
 backend/
+  admin-service/
+  game-service/
+  gateway-service/
+  member-service/
+  rank-service/
+  wallet-service/
 frontend/
 database/
+  mysql/
+  postgres/
 kafka/
 docs/
+```
+
+## Local Setup
+
+1. 複製環境變數範本：
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. 依照本機 port 需求調整 `.env`。
+
+3. 啟動基礎服務：
+
+   ```bash
+   docker-compose up -d
+   ```
+
+4. 檢查服務狀態：
+
+   ```bash
+   docker-compose ps
+   ```
+
+5. 開啟 Kafka UI：
+
+   ```text
+   http://localhost:8085
+   ```
+
+## Infrastructure Notes
+
+- MySQL、PostgreSQL、Redis、Kafka 都有基本 healthcheck。
+- Kafka topic 會由 `kafka-init` service 自動建立。
+- MySQL 與 PostgreSQL 的 init SQL 只會在 volume 第一次建立時執行。
+- 若需要重跑資料庫初始化，請先確認不需要保留本機資料，再執行：
+
+  ```bash
+  docker-compose down -v
+  docker-compose up -d
+  ```
+
+## Kafka Topics
+
+- `member.registered`
+- `wallet.debit`
+- `wallet.credit`
+- `game.result`
+- `rank.update`
+- `notification.push`
+
+## Branch Workflow
+
+建議從乾淨且已同步的 `main` 建立功能分支：
+
+```bash
+git switch main
+git pull
+git switch -c feature/<scope>
+```

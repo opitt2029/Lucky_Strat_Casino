@@ -1,47 +1,25 @@
 #!/bin/bash
 
+set -euo pipefail
+
 echo "Creating Kafka topics..."
 
-kafka-topics --create \
-  --if-not-exists \
-  --bootstrap-server lucky-star-kafka:29092 \
-  --replication-factor 1 \
-  --partitions 3 \
-  --topic member.registered
+topics=(
+  "member.registered"
+  "wallet.debit"
+  "wallet.credit"
+  "game.result"
+  "rank.update"
+  "notification.push"
+)
 
-kafka-topics --create \
-  --if-not-exists \
-  --bootstrap-server lucky-star-kafka:29092 \
-  --replication-factor 1 \
-  --partitions 3 \
-  --topic wallet.debit
-
-kafka-topics --create \
-  --if-not-exists \
-  --bootstrap-server lucky-star-kafka:29092 \
-  --replication-factor 1 \
-  --partitions 3 \
-  --topic wallet.credit
-
-kafka-topics --create \
-  --if-not-exists \
-  --bootstrap-server lucky-star-kafka:29092 \
-  --replication-factor 1 \
-  --partitions 3 \
-  --topic game.result
-
-kafka-topics --create \
-  --if-not-exists \
-  --bootstrap-server lucky-star-kafka:29092 \
-  --replication-factor 1 \
-  --partitions 3 \
-  --topic rank.update
-
-kafka-topics --create \
-  --if-not-exists \
-  --bootstrap-server lucky-star-kafka:29092 \
-  --replication-factor 1 \
-  --partitions 3 \
-  --topic notification.push
+for topic in "${topics[@]}"; do
+  kafka-topics --create \
+    --if-not-exists \
+    --bootstrap-server lucky-star-kafka:29092 \
+    --replication-factor 1 \
+    --partitions 3 \
+    --topic "${topic}"
+done
 
 echo "Kafka topics created."
