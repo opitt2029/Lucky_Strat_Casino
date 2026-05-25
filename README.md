@@ -61,6 +61,10 @@ kafka/
 docs/
 ```
 
+## Documentation
+
+- [專案基底功能說明](docs/PROJECT_BASE_EXPLANATION.md)
+
 ## Local Setup
 
 1. 複製環境變數範本：
@@ -94,28 +98,3 @@ docs/
 - MySQL、PostgreSQL、Redis、Kafka 都有基本 healthcheck。
 - Kafka topic 會由 `kafka-init` service 自動建立。
 - MySQL 與 PostgreSQL 的 init SQL 只會在 volume 第一次建立時執行。
-- 若需要重跑資料庫初始化，請先確認不需要保留本機資料，再執行：
-
-  ```bash
-  docker-compose down -v
-  docker-compose up -d
-  ```
-
-## Kafka Topics
-
-- `member.registered`
-- `wallet.debit`
-- `wallet.credit`
-- `game.result`
-- `rank.update`
-- `notification.push`
-
-## Branch Workflow
-
-建議從乾淨且已同步的 `main` 建立功能分支：
-
-```bash
-git switch main
-git pull
-git switch -c feature/<scope>
-```
