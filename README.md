@@ -93,6 +93,30 @@ docs/
    http://localhost:8085
    ```
 
+## Frontend Development
+
+前端基底位於 `frontend/`，目前已建立 React + Vite + Router + Redux Toolkit + Axios + Tailwind CSS。
+
+本機開發：
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Docker 開發：
+
+```bash
+docker compose up -d frontend
+```
+
+預設入口：
+
+```text
+http://localhost:5173
+```
+
 ## Infrastructure Notes
 
 - MySQL、PostgreSQL、Redis、Kafka 都有基本 healthcheck。
