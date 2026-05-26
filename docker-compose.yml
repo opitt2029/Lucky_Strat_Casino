@@ -63,8 +63,8 @@ services:
     ports:
       - "${KAFKA_PORT}:9092"
     environment:
-      # KRaft 模式（無 Zookeeper）— Kafka 4.x 起為唯一支援模式
-      CLUSTER_ID: lucky-star-kafka-cluster
+      # KRaft 模式（無 Zookeeper）；CLUSTER_ID 必須是 Kafka Base64 UUID 格式
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID}
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@lucky-star-kafka:29093
