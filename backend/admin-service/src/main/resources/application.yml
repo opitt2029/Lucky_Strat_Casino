@@ -1,0 +1,71 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: admin-service
+
+  # ================================================================
+  # 雙資料庫設定（ADR-001：MySQL 讀取各服務資料 + PostgreSQL 寫 admin_alerts）
+  # 注意：雙 DataSource 需要自訂 DataSourceConfig.java
+  # ================================================================
+
+  # MySQL — 主要讀庫（@Primary DataSource）
+  # 讀取 members、friendships 等各服務資料
+  datasource:
+    jdbc-url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3307}/${MYSQL_DATABASE:lucky_star_casino}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Taipei&characterEncoding=UTF-8
+    username: ${MYSQL_USER:lucky_user}
+    password: ${MYSQL_PASSWORD:lucky_password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+
+  # 注意：spring.jpa.* 在此服務無效 —— EntityManagerFactory 由 DataSourceConfig.java
+  # 手動建立。MySQL EMF 固定 validate；Postgres EMF 讀 JPA_DDL_AUTO 環境變數（預設 validate）。
+
+  # PostgreSQL — admin_alerts 寫入端 DataSource（DataSourceConfig.postgresDataSource 綁定此前綴）
+  datasource-postgres:
+    jdbc-url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:lucky_star_casino}
+    username: ${POSTGRES_USER:lucky_user}
+    password: ${POSTGRES_PASSWORD:lucky_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 30000
+
+  # Kafka
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      retries: 3
+    consumer:
+      group-id: admin-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+
+  # Security（SUPER_ADMIN / OPERATOR 角色）
+  security:
+    user:
+      name: disabled
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.luckystar.admin: ${LOG_LEVEL_APP:INFO}
+    org.springframework.security: ${LOG_LEVEL_SECURITY:INFO}
+    org.hibernate.SQL: ${LOG_LEVEL_SQL:OFF}
