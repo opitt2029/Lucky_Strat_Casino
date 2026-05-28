@@ -5,6 +5,237 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [T-019] — 2026-05-28 — Kafka 契約修復 + DLT + Transactional Outbox
+
+### Context
+架構審查發現 `member.registered` 的 producer/consumer 契約不一致導致新人禮金鏈路從未端到端跑通，
+並缺乏毒丸訊息防護與 DB↔Kafka 原子性。本次修復分三部分。
+
+### Fixed — producer/consumer 契約（嚴重）
+- `service/AuthService.java`
+  - 原 `kafkaTemplate.send("member.registered", String.valueOf(id))` 實際把 id 當成 **value** 送出（key 為 null），
+    consumer 端 `objectMapper.readValue(...)` 永遠解析失敗 → 不 ack → 毒丸訊息卡死 partition、新人禮金永不發放
+  - 改為送出與 `MemberRegisteredEvent` 契約一致的完整 JSON，並用 `(topic, key, value)` 三參數版本
+- `consumer/MemberRegisteredConsumer.java`
+  - 移除自行 try-catch 吞例外的邏輯，失敗直接拋例外交給 `DefaultErrorHandler`
+
+### Added — Kafka 錯誤處理 + DLT
+- `config/KafkaConfig.java`（新）
+  - `DefaultErrorHandler`：暫時性錯誤重試 3 次（間隔 2 秒），`JsonProcessingException` / `IllegalArgumentException`
+    等格式類錯誤不重試直接送 DLT；`DeadLetterPublishingRecoverer` 送往 `<topic>.DLT`
+  - `ConcurrentKafkaListenerContainerFactory` 維持 `MANUAL_IMMEDIATE` 手動 ack
+- `config/JwtFilterConfig.java`：`@EnableKafka` 移出至 `KafkaConfig`（職責分離）
+
+### Added — Transactional Outbox Pattern
+- `database/mysql/migration/V3__create_outbox_events.sql`：`outbox_events` 表（topic/kafka_key/payload/status/retry_count）
+- `entity/OutboxEvent.java`、`repository/OutboxEventRepository.java`（撈 PENDING）
+- `service/OutboxService.java`：`save(topic, key, payload)` 沿用呼叫端交易寫入 PENDING 事件（刻意不開新交易）
+- `service/OutboxPoller.java`：`@Scheduled` 輪詢 PENDING → 同步等 broker 確認 → 標記 SENT / 失敗累加 retry
+- `MemberServiceApplication.java`：加 `@EnableScheduling`
+- `application.yml`：producer 加 `acks: all` + `enable.idempotence`；新增 `outbox.poll-interval-ms`（預設 5000）
+
+### Modified — 三個 producer 改走 Outbox
+- `AuthService.register`（加 `@Transactional`）、`NewGiftService`、`CheckinService`
+  - `kafkaTemplate.send(...)` 改為 `outboxService.save(...)`，事件與業務資料同一交易
+  - 移除原 best-effort / fail-fast 的 try-catch：DB 寫入與事件投遞改為原子綁定
+
+### Tests
+- 更新 `MemberRegisteredConsumerTest`（斷言例外往上拋而非吞掉）
+- 更新 `AuthServiceTest` / `NewGiftServiceTest` / `CheckinServiceTest`：改 mock `OutboxService`，
+  新增「outbox 失敗會往上拋」案例取代舊的 best-effort 斷言
+- 新增 `OutboxPollerTest`（投遞成功→SENT / 失敗→保持 PENDING 且 retry+1 / 無 PENDING→不碰 Kafka）
+- 修復 3 個 pre-existing 編譯失敗測試（對齊現行 API）：
+  - `AuthServiceLoginTest` / `RefreshTokenServiceTest`：三參數 token API、`getClaims`、`getRemainingTtlMs`、`status` 欄位
+  - `InternalSecretFilterTest`：建構子注入 secret
+- 全套件 69 tests 通過
+
+### Fixed — members schema 對齊 entity（解決 ddl-auto=validate 啟動失敗）
+- `database/mysql/migration/V4__align_members_with_entity.sql`（新）
+  - 補 `role` 欄位（V1 完全缺漏；RBAC / JWT role claim 必需）
+  - `is_active`(BOOLEAN) → `status`(VARCHAR)，含資料轉換 `TRUE→'ACTIVE'` / `FALSE→'DISABLED'`
+  - `avatar_url`(VARCHAR 500) → `avatar`(TEXT)
+  - `nickname` 對齊 entity 改為 `NOT NULL`（register 以 `@NotBlank` 強制帶 nickname）
+  - 不修改已套用的 V1，改以 V4 ALTER（遵守 Flyway checksum 規範）
+- 驗證：grep 確認無程式碼殘留引用 `is_active` / `avatar_url`（搜到的 isActive 皆屬 task_definitions）；
+  postgres migration 無 members 表（members 僅為 MySQL 寫入端），故只需改 MySQL
+
+### Known Issues / 後續
+- **DLT topic 需預建**：production 應手動建立 `member.registered.DLT`（partition 數對齊原 topic）
+- **OutboxPoller 多實例**：目前未對撈出列加鎖，多副本部署需改用 `FOR UPDATE SKIP LOCKED` 或 ShedLock
+
+---
+
+## [T-018] — 2026-05-28 — New Player Gift Kafka Consumer
+
+### Added
+- `dto/MemberRegisteredEvent.java` — Kafka 事件反序列化 record（playerId / username / email）
+- `service/NewGiftService.java` — `@Transactional processNewGift(Long playerId)`
+  - Step 1：`findById` 找不到玩家 → log warn + return（不拋例外）
+  - Step 2：`isNewGiftClaimed == true` → log info + return（不呼叫 save 或 send）
+  - Step 3：`setIsNewGiftClaimed(true)` + `save` — 必須在 Kafka send **之前**完成
+  - Step 4：發布 `wallet.credit` 事件（topic / key / JSON payload），失敗包成 `RuntimeException` 上拋
+  - Step 5：log info "New gift dispatched"
+- `consumer/MemberRegisteredConsumer.java` — `@KafkaListener(topics = "member.registered")`
+  - 成功：`processNewGift` → `ack.acknowledge()`
+  - 失敗：log error，**不 ack**，讓 Kafka 重投遞
+
+### Modified
+- `entity/Member.java`
+  - 補加 `isNewGiftClaimed` 欄位（DB schema `is_new_gift_claimed BOOLEAN NOT NULL DEFAULT FALSE` 已存在，entity 於 T-014 rebuild 時漏加）
+- `config/JwtFilterConfig.java`
+  - 加入 `@EnableKafka`（全專案唯一，未存在於任何既有 `@Configuration`）
+
+### Tests Added
+- `service/NewGiftServiceTest.java` — 5 個 Mockito 測試
+  - 找不到 member → never save / never send（×1）
+  - 已領取 → never save / never send（×1）
+  - 正常流程 → setIsNewGiftClaimed(true)、save once、send once（×1）
+  - idempotencyKey 格式驗證 `"new-gift-{playerId}"`（×1）
+  - Kafka send 拋 RuntimeException → save 已在 throw 前被呼叫一次（×1）
+- `consumer/MemberRegisteredConsumerTest.java` — 3 個 Mockito 測試
+  - 合法 JSON → processNewGift 以正確 playerId 呼叫、ack.acknowledge() 呼叫一次（×1）
+  - 格式錯誤 JSON（JsonProcessingException）→ never processNewGift、never ack（×1）
+  - processNewGift 拋例外 → never ack（×1）
+
+### Implementation Notes
+- **交易與 Kafka 一致性**：`save` 在 Kafka send 之前執行；若 Kafka send 失敗，`RuntimeException` 上拋觸發 `@Transactional` 回滾，`isNewGiftClaimed` 恢復 `false`，consumer 不 ack，Kafka 重投遞後重試整個流程。這確保「DB 寫入成功 ↔ Kafka 事件發出」一致，非靜默忽略失敗
+- **防重複發放（雙重防線）**：DB `isNewGiftClaimed` 防止 member-service 重複發送；wallet.credit 的 `idempotencyKey: "new-gift-{playerId}"` 防止 Wallet Service 重複入帳
+- **不拋例外的設計選擇（Step 1）**：找不到 member 時 log warn 後 return，而非拋例外。因為 Kafka consumer 找不到 member 拋例外會觸發無限重投遞；此場景屬資料不一致（member 尚未寫入），靜默 skip 更安全
+
+---
+
+## [T-017] — 2026-05-28 — Daily Check-in API
+
+### Added
+- `entity/DailyCheckin.java` — `@Entity @Table("daily_checkins")`；`@PrePersist` 自動設 `createdAt`；`checkinDate` 型別 `LocalDate`
+- `repository/DailyCheckinRepository.java`
+  - `findByPlayerIdAndCheckinDate` — 今日重複簽到防護
+  - `findTopByPlayerIdOrderByCheckinDateDesc` — 取最近一筆計算連續天數
+- `dto/CheckinResponse.java` — checkinId / checkinDate / consecutiveDays / rewardAmount
+- `service/CheckinService.java` — `@Transactional checkin(Long playerId)`
+  - 時區：`LocalDate.now(ZoneId.of("Asia/Taipei"))`
+  - 重複簽到 → `AlreadyCheckedInException`（409）
+  - 昨天有記錄 → `consecutiveDays = last + 1`；否則 → `1`
+  - Kafka send 包在 try-catch，失敗只 log，不 rollback（best-effort）
+  - 固定獎勵金額：50
+- `controller/CheckinController.java` — `POST /api/v1/wallet/daily-checkin`（200）；playerId 從 JWT 取得
+- `exception/AlreadyCheckedInException.java` — HTTP 409
+
+### Modified
+- `exception/GlobalExceptionHandler.java`
+  - 追加 `handleAlreadyCheckedIn`（HTTP 409）
+
+### Tests Added
+- `service/CheckinServiceTest.java` — 6 個 Mockito 測試
+  - 今日已簽到 → AlreadyCheckedInException（×1）
+  - 無歷史記錄 → consecutiveDays = 1（×1）
+  - 昨天有記錄 → consecutiveDays = lastRecord + 1（×1）
+  - 2 天前有記錄（gap）→ consecutiveDays = 1（×1）
+  - Kafka send 拋例外 → 仍回傳 CheckinResponse（×1）
+  - idempotencyKey 格式驗證 `"checkin-{playerId}-{date}"`（×1）
+
+### Implementation Notes
+- **Kafka 策略與 T-018 的差異**：CheckinService 的 Kafka send 為 best-effort（try-catch 吞掉錯誤），因為簽到記錄本身已入庫；wallet.credit 的 `idempotencyKey: "checkin-{playerId}-{date}"` 是最後防線。NewGiftService（T-018）則選擇讓 Kafka 失敗觸發回滾與重試，因為新人禮金只應發放一次且較為關鍵
+- **連假天數計算邏輯**：以 `LocalDate.equals(today.minusDays(1))` 精確比對，任何非「昨天」情況（首次、中斷）均重設為 1
+
+---
+
+## [T-016] — 2026-05-28 — Task System 資料層
+
+### Added
+- `entity/TaskType.java` — enum：`FIRST_LOGIN` / `DAILY_CHECKIN` / `BET_COUNT` / `INVITE_FRIEND`
+- `entity/TaskDefinition.java` — `@Entity @Table("task_definitions")`；`taskCode` 唯一索引；`taskType` 以 `@Enumerated(EnumType.STRING)` 儲存
+- `entity/PlayerTask.java` — `@Entity @Table("player_tasks")`；`@ManyToOne(fetch = FetchType.LAZY)` 關聯 `TaskDefinition`
+- `repository/TaskDefinitionRepository.java`
+  - `findByTaskCode(String)` — 依唯一碼查詢單筆
+  - `findByTaskTypeAndIsActive(TaskType, Boolean)` — 依任務類型 + 啟用狀態篩選
+  - `findByIsActive(Boolean)` — 列出所有啟用/停用任務
+- `repository/PlayerTaskRepository.java`
+  - `findByPlayerIdAndTaskDefinition_Id(Long, Long)` — 精確比對玩家 + 任務 ID
+  - `findByPlayerId(Long)` — 查詢玩家全部任務進度
+  - `findByPlayerIdAndTaskDefinition_TaskCode(Long, String)` — 跨關聯以 taskCode 查詢
+- `exception/TaskDefinitionNotFoundException.java` — HTTP 404
+- `exception/PlayerTaskNotFoundException.java` — HTTP 404
+- `database/mysql/migration/V2__seed_task_definitions.sql` — 8 筆預設任務種子資料（`ON DUPLICATE KEY UPDATE` 確保冪等）
+- `src/test/resources/application.yml` — 覆寫 `spring.jpa.properties.hibernate.dialect: H2Dialect`，避免 `@DataJpaTest` 套用 MySQL Dialect 導致 schema 建立失敗
+
+### Modified
+- `exception/GlobalExceptionHandler.java`
+  - 追加 `handleTaskDefinitionNotFound`（HTTP 404）
+  - 追加 `handlePlayerTaskNotFound`（HTTP 404）
+- `pom.xml`
+  - 追加 `com.h2database:h2` test scope，供 `@DataJpaTest` 內嵌資料庫使用
+
+### Tests Added
+- `repository/TaskDefinitionRepositoryTest.java` — 4 個 `@DataJpaTest` 測試
+  - `findByTaskCode` 存在 / 不存在各一
+  - `findByIsActive(true)` — 2 筆 active + 1 筆 inactive，只回傳 active
+  - `findByTaskTypeAndIsActive(DAILY_CHECKIN, true)` — 只回傳 DAILY_CHECKIN 類型
+- `repository/PlayerTaskRepositoryTest.java` — 3 個 `@DataJpaTest` 測試，`@BeforeEach` 先建立 `TaskDefinition` 前置資料
+  - `findByPlayerIdAndTaskDefinition_Id` — 儲存後可正確取回
+  - `findByPlayerIdAndTaskDefinition_TaskCode` — 正確玩家 + code → 非空
+  - `findByPlayerIdAndTaskDefinition_TaskCode` — 錯誤 playerId → 空
+
+### Implementation Notes
+- **`@DataJpaTest` 切片行為**：預設 `Replace.ANY` 以 H2 替換 MySQL datasource，並自動套用 `ddl-auto=create-drop`。Security / JWT beans 不在 JPA slice 內，因此 `JWT_SECRET` / `INTERNAL_SECRET` 的 `?` 強制環境變數限制不會被觸發
+- **種子資料冪等性**：採用 `ON DUPLICATE KEY UPDATE` 而非 `INSERT IGNORE`，確保未來任務定義有異動時重跑 migration 能同步更新欄位值
+- **Lazy Loading 測試**：`PlayerTask.taskDefinition` 為 `LAZY`，測試透過 `TestEntityManager.persistAndFlush` 在同一 Session 內操作，不觸發 `LazyInitializationException`
+- **本 task 無 Controller**：僅交付資料層（Entity / Repository / Exception），Service 與 API 端點由後續 task 實作
+
+---
+
+## [T-015] — 2026-05-28 — Friendship System API
+
+### Added
+- `entity/FriendshipStatus.java` — enum：`PENDING` / `ACCEPTED` / `REJECTED`
+- `entity/Friendship.java` — `@Entity @Table("friendships")`；`@PrePersist` / `@PreUpdate` 自動設時間戳
+- `repository/FriendshipRepository.java` — 雙向好友查詢 + JPQL `countAcceptedFriends` / `findAcceptedFriends`；`findByReceiverIdAndStatus`
+- `dto/FriendRequestDto.java` — `@NotNull receiverId`
+- `dto/FriendshipResponse.java` — 好友關係操作通用回應（id / requesterId / receiverId / status / timestamps）
+- `dto/FriendListResponse.java` — 好友列表元素（friendshipId / friendId / username / nickname / avatarUrl / friendSince）
+- `service/FriendshipService.java` — 5 個業務方法
+  - `sendFriendRequest`：自我請求防護 → receiver 存在驗證 → 200 人上限 → 雙向重複檢查 → REJECTED 記錄復活為 PENDING
+  - `acceptFriendRequest`：receiver 身分驗證 → PENDING 狀態驗證 → receiver 人數上限 → 設為 ACCEPTED
+  - `rejectFriendRequest`：receiver 身分驗證 → PENDING 狀態驗證 → 設為 REJECTED
+  - `listFriends`：雙向查詢 ACCEPTED 記錄 → `findAllById` 批次撈 Member 資料 → 組 FriendListResponse
+  - `deleteFriend`：任一方身分驗證 → ACCEPTED 狀態驗證 → 刪除記錄
+- `controller/FriendshipController.java` — 5 個 REST 端點，基底路徑 `/api/v1/friends`
+
+| Method | Path | 成功 HTTP |
+|--------|------|-----------|
+| POST | `/api/v1/friends/request` | 201 |
+| PUT | `/api/v1/friends/{friendshipId}/accept` | 200 |
+| PUT | `/api/v1/friends/{friendshipId}/reject` | 200 |
+| GET | `/api/v1/friends` | 200 |
+| DELETE | `/api/v1/friends/{friendshipId}` | 200 |
+
+- `exception/SelfFriendRequestException.java` — HTTP 400
+- `exception/FriendLimitExceededException.java` — HTTP 400（上限 200 人）
+- `exception/FriendshipAlreadyExistsException.java` — HTTP 409
+- `exception/FriendshipNotFoundException.java` — HTTP 404
+- `exception/ForbiddenOperationException.java` — HTTP 403
+- `exception/InvalidFriendshipStatusException.java` — HTTP 400
+
+### Modified
+- `exception/GlobalExceptionHandler.java`
+  - 追加 6 個 `@ExceptionHandler`（對應上方 6 個新 exception）；原有內容未異動
+
+### Tests Added
+- `service/FriendshipServiceTest.java` — 14 個單元測試（`@ExtendWith(MockitoExtension.class)`）
+  - `sendFriendRequest`：自我請求（×1）、receiver 不存在（×1）、人數超限（×1）、已是好友（×1）、REJECTED 復活（×1）、正常新建（×1）
+  - `acceptFriendRequest`：非 receiver（×1）、非 PENDING 狀態（×1）、正常接受（×1）
+  - `rejectFriendRequest`：正常拒絕（×1）
+  - `deleteFriend`：非當事人（×1）、PENDING 狀態（×1）、正常刪除（×1）
+  - `listFriends`：雙向好友各一筆，回傳 2 筆且 friendId 正確（×1）
+
+### Security Notes
+- playerId 從 JWT SecurityContext（`authentication.getName()`）取得，不接受 path variable 或 request body 傳入
+- 好友人數上限 200：requester 在發送時檢查，receiver 在接受時檢查，兩端均有保護
+- `deleteFriend` 限 ACCEPTED 好友才能刪除，PENDING / REJECTED 狀態均拒絕，防止繞過拒絕機制
+- 所有端點由 `SecurityConfig` 既有的 `.anyRequest().authenticated()` 規則覆蓋，無需修改 SecurityConfig
+
+---
+
 ## [Security Audit P1] — 2026-05-28 — P1 安全與穩定性修復（7 項）
 
 ### Context

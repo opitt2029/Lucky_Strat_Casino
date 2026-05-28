@@ -44,6 +44,9 @@ public class Member {
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
 
+    @Column(name = "is_new_gift_claimed", nullable = false)
+    private Boolean isNewGiftClaimed = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

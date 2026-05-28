@@ -36,6 +36,9 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
       retries: 3
+      acks: all                      # 等所有 in-sync replica 落盤才算成功（金流事件不可遺失）
+      properties:
+        enable.idempotence: true     # broker 端去重，避免 retry 造成重複訊息
     consumer:
       group-id: member-service-group
       auto-offset-reset: earliest
@@ -69,3 +72,6 @@ logging:
 
 internal:
   secret: ${INTERNAL_SECRET:?INTERNAL_SECRET environment variable is required}
+
+outbox:
+  poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:5000}   # OutboxPoller 輪詢間隔（毫秒）
