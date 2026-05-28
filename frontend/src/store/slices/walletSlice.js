@@ -1,5 +1,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import { mockApi } from '../../services/mockApi'
+import { walletApi } from '../../services/walletApi'
+import { extractError } from '../../services/memberApi'
 
 const initialState = {
   balance: 0,
@@ -16,6 +18,7 @@ const initialState = {
   checkIn: {
     loading: false,
     reward: null,
+    consecutiveDays: null,
     message: '',
   },
   loading: false,
@@ -24,17 +27,17 @@ const initialState = {
 
 export const fetchWallet = createAsyncThunk('wallet/fetchWallet', async (_, { rejectWithValue }) => {
   try {
-    return await mockApi.getWallet()
+    return await walletApi.getBalance()
   } catch (error) {
-    return rejectWithValue(error.message)
+    return rejectWithValue(extractError(error))
   }
 })
 
 export const dailyCheckIn = createAsyncThunk('wallet/dailyCheckIn', async (_, { rejectWithValue }) => {
   try {
-    return await mockApi.checkIn()
+    return await walletApi.dailyCheckIn()
   } catch (error) {
-    return rejectWithValue(error.message)
+    return rejectWithValue(extractError(error))
   }
 })
 
@@ -111,7 +114,8 @@ const walletSlice = createSlice({
         state.balance = action.payload.wallet.balance
         state.frozenAmount = action.payload.wallet.frozenAmount ?? 0
         state.checkIn.reward = action.payload.reward
-        state.checkIn.message = `簽到成功，獲得 ${action.payload.reward.toLocaleString()} 星幣`
+        state.checkIn.consecutiveDays = action.payload.consecutiveDays
+        state.checkIn.message = `簽到成功，連續 ${action.payload.consecutiveDays} 天，獲得 ${action.payload.reward.toLocaleString()} 星幣`
       })
       .addCase(dailyCheckIn.rejected, (state, action) => {
         state.checkIn.loading = false
