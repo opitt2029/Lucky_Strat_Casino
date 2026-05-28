@@ -6,14 +6,20 @@ import com.luckystar.wallet.postgres.entity.Wallet;
 import com.luckystar.wallet.postgres.repository.WalletRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -86,5 +92,38 @@ class WalletServiceTest {
         WalletBalanceResponse response = walletService.getBalance(3L);
 
         assertThat(response.getAvailableBalance()).isEqualTo(response.getBalance());
+    }
+
+    // ── T-015: createWallet ──────────────────────────────────────────────────
+
+    @Test
+    void createWallet_newPlayer_savesWallet() {
+        when(walletRepository.existsById(1L)).thenReturn(false);
+
+        walletService.createWallet(1L);
+
+        ArgumentCaptor<Wallet> captor = ArgumentCaptor.forClass(Wallet.class);
+        verify(walletRepository, times(1)).save(captor.capture());
+        assertThat(captor.getValue().getPlayerId()).isEqualTo(1L);
+        assertThat(captor.getValue().getBalance()).isEqualTo(0L);
+    }
+
+    @Test
+    void createWallet_existingPlayer_skipsAndDoesNotSave() {
+        when(walletRepository.existsById(2L)).thenReturn(true);
+
+        walletService.createWallet(2L);
+
+        verify(walletRepository, never()).save(any());
+    }
+
+    @Test
+    void createWallet_dataIntegrityViolation_handledSilently() {
+        when(walletRepository.existsById(3L)).thenReturn(false);
+        when(walletRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate"));
+
+        walletService.createWallet(3L);
+
+        verify(walletRepository, times(1)).save(any());
     }
 }
