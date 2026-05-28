@@ -5,6 +5,40 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [feat] — 2026-05-28 — 錢包餘額/簽到前後端串接 + Gateway 簽到路由修復（FIX-5）
+
+### Fixed
+
+- `backend/gateway-service/src/main/resources/application.yml`
+  - **FIX-5（路由衝突）**：新增 `member-checkin` 路由，將 `POST /api/v1/wallet/daily-checkin` 指向 member-service（8081），並排在 `wallet` 路由**之前**。
+  - 原因：簽到端點實作在 member-service，但路徑落在 `/api/v1/wallet/` 底下，原本會被 `wallet` 路由（`/api/v1/wallet/**` → wallet-service）整段攔截，導致透過 Gateway 簽到永遠打到 wallet-service 而回 404。
+  - Spring Cloud Gateway 依設定順序「先匹配先贏」，故將精確路徑 `daily-checkin` 排在前面即可正確分流。
+
+### Added
+
+- `frontend/src/services/walletApi.js`（新增）
+  - `getBalance()` — 呼叫 `GET /api/v1/wallet/balance`，回傳 `{ balance, frozenAmount, availableBalance }`。
+  - `dailyCheckIn()` — 呼叫 `POST /api/v1/wallet/daily-checkin`；因後端回應只含 `rewardAmount`/`consecutiveDays` 不含最新餘額，故簽到後再查一次餘額，組成 `{ reward, consecutiveDays, wallet }`。
+
+### Modified
+
+- `frontend/src/store/slices/walletSlice.js`
+  - `fetchWallet`、`dailyCheckIn` 兩個 thunk 由 `mockApi` 改用 `walletApi` 真實 API；錯誤訊息改用 `extractError()` 取後端訊息。
+  - `checkIn` state 新增 `consecutiveDays`，簽到成功訊息改為「連續 N 天，獲得 X 星幣」。
+  - `fetchTransactions`、`giftCoins` **暫留 mockApi**（後端對應 API 尚未實作）。
+
+### Verified
+
+- `frontend` 執行 `npm run build` 成功。
+
+### Note
+
+- 餘額串接的端到端正確性依賴 **FIX-1** 合併後 wallet-service 正確讀取 `X-User-Id`（已於 develop 合併）；前端本身不受影響。
+- Profile 頁的「連續簽到天數」仍來自 `mapProfile` 的預設值——member-service 目前**沒有 GET 連續天數的端點**（`CheckinController` 只有 POST），需後端補 query API 才能在載入時顯示正確天數。
+- 另外發現 `FriendshipController`（`/api/v1/friends/**`）Gateway **完全沒有路由**，好友功能透過 Gateway 不可達，待後續補路由。
+
+---
+
 ## [security] — 2026-05-28 — Gateway 身份 Header 防偽造與 /admin 權限強制（FIX-3 / FIX-4）
 
 ### Fixed

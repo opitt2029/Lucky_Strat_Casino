@@ -49,6 +49,12 @@ spring:
           uri: ${MEMBER_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/v1/player/**
+        # 每日簽到（需 JWT）：端點實作在 member-service，路徑落在 /api/v1/wallet 底下，
+        # 必須排在下方 wallet 路由「之前」，否則會被 /api/v1/wallet/** 攔截轉發到 wallet-service。
+        - id: member-checkin
+          uri: ${MEMBER_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/wallet/daily-checkin
         # 錢包 API（需 JWT）
         - id: wallet
           uri: ${WALLET_SERVICE_URL:http://localhost:8082}
