@@ -176,6 +176,79 @@ class JwtAuthenticationGlobalFilterTest {
     }
 
     @Test
+    void adminPath_adminRole_isForwarded() {
+        when(redis.hasKey(anyString())).thenReturn(Mono.just(false));
+        AtomicReference<ServerWebExchange> captured = new AtomicReference<>();
+
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/admin/dashboard")
+                .header("Authorization", "Bearer " + token("1", "ADMIN", "jti-a", 60_000))
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        filter.filter(exchange, capturingChain(captured)).block();
+
+        assertThat(captured.get()).isNotNull();
+        assertThat(captured.get().getRequest().getHeaders().get("X-User-Role")).containsExactly("ADMIN");
+    }
+
+    @Test
+    void adminPath_nonAdminRole_returns403AndDoesNotForward() {
+        when(redis.hasKey(anyString())).thenReturn(Mono.just(false));
+        GatewayFilterChain chain = mock(GatewayFilterChain.class);
+
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/admin/dashboard")
+                .header("Authorization", "Bearer " + token("42", "PLAYER", "jti-b", 60_000))
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(exchange.getResponse().getHeaders().getFirst("X-Auth-Error")).isEqualTo("admin role required");
+        verify(chain, never()).filter(exchange);
+    }
+
+    @Test
+    void adminPath_noRoleClaim_returns403() {
+        when(redis.hasKey(anyString())).thenReturn(Mono.just(false));
+        GatewayFilterChain chain = mock(GatewayFilterChain.class);
+
+        // 不帶 role claim
+        String noRoleToken = Jwts.builder()
+                .subject("42").id("jti-c")
+                .expiration(new Date(System.currentTimeMillis() + 60_000))
+                .signWith(key).compact();
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/admin/dashboard")
+                .header("Authorization", "Bearer " + noRoleToken)
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void nonAdminPath_nonAdminRole_isForwarded() {
+        when(redis.hasKey(anyString())).thenReturn(Mono.just(false));
+        AtomicReference<ServerWebExchange> captured = new AtomicReference<>();
+
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/api/v1/player/profile")
+                .header("Authorization", "Bearer " + token("42", "PLAYER", "jti-d", 60_000))
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        filter.filter(exchange, capturingChain(captured)).block();
+
+        assertThat(captured.get()).isNotNull();
+        assertThat(captured.get().getRequest().getHeaders().get("X-User-Role")).containsExactly("PLAYER");
+    }
+
+    @Test
     void validToken_noForgedHeaders_forwardsClaims() {
         when(redis.hasKey(anyString())).thenReturn(Mono.just(false));
         AtomicReference<ServerWebExchange> captured = new AtomicReference<>();
