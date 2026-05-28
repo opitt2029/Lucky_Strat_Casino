@@ -36,6 +36,8 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationGlobalFilter.class);
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String BLACKLIST_KEY_PREFIX = "jwt:blacklist:";
+    private static final String USER_ID_HEADER = "X-User-Id";
+    private static final String USER_ROLE_HEADER = "X-User-Role";
 
     private final JwtProperties props;
     private final SecretKey signingKey;
@@ -52,7 +54,14 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
         String path = exchange.getRequest().getURI().getPath();
 
         if (isWhitelisted(path)) {
-            return chain.filter(exchange);
+            // 白名單路徑無經驗證的身份，剝除用戶端可能偽造的身份 header 再放行
+            ServerHttpRequest stripped = exchange.getRequest().mutate()
+                    .headers(h -> {
+                        h.remove(USER_ID_HEADER);
+                        h.remove(USER_ROLE_HEADER);
+                    })
+                    .build();
+            return chain.filter(exchange.mutate().request(stripped).build());
         }
 
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
@@ -91,9 +100,16 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
                     if (Boolean.TRUE.equals(blocked)) {
                         return unauthorized(exchange, "token revoked");
                     }
+                    String userIdValue = userId == null ? "" : userId;
+                    String roleValue = role == null ? "" : role.toString();
+                    // 先 remove 再 set：避免用戶端偽造的同名 header 以重複值殘留，導致下游 getFirst() 讀到偽造值
                     ServerHttpRequest mutated = exchange.getRequest().mutate()
-                            .header("X-User-Id", userId == null ? "" : userId)
-                            .header("X-User-Role", role == null ? "" : role.toString())
+                            .headers(h -> {
+                                h.remove(USER_ID_HEADER);
+                                h.remove(USER_ROLE_HEADER);
+                                h.set(USER_ID_HEADER, userIdValue);
+                                h.set(USER_ROLE_HEADER, roleValue);
+                            })
                             .build();
                     return chain.filter(exchange.mutate().request(mutated).build());
                 });
