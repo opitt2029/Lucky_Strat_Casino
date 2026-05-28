@@ -8,9 +8,9 @@ import com.luckystar.member.security.JwtTokenProvider;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.format.DateTimeFormatter;
 
@@ -25,8 +25,9 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final TokenRedisService tokenRedisService;
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final OutboxService outboxService;
 
+    @Transactional
     public RegisterResponse register(RegisterRequest request) {
         if (memberRepository.existsByUsername(request.getUsername())) {
             throw new MemberAlreadyExistsException("Username already exists");
@@ -43,11 +44,11 @@ public class AuthService {
 
         Member saved = memberRepository.save(member);
 
-        try {
-            kafkaTemplate.send("member.registered", String.valueOf(saved.getId()));
-        } catch (Exception e) {
-            log.warn("Failed to send Kafka event for member {}: {}", saved.getId(), e.getMessage());
-        }
+        // 與會員寫入同一交易寫入 outbox（key=playerId 確保同一玩家事件落在同一 partition）；
+        // 交易 commit 後由 OutboxPoller 非同步投遞至 member.registered，保證 DB↔Kafka 一致
+        MemberRegisteredEvent event = new MemberRegisteredEvent(
+                saved.getId(), saved.getUsername(), saved.getEmail());
+        outboxService.save("member.registered", String.valueOf(saved.getId()), event);
 
         return new RegisterResponse(
                 saved.getId(),
