@@ -3,12 +3,25 @@ package com.luckystar.wallet.postgres.entity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "wallets")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Wallet {
 
     @Id
@@ -16,10 +29,12 @@ public class Wallet {
     private Long playerId;
 
     @Column(name = "balance", nullable = false)
-    private Long balance;
+    @Builder.Default
+    private Long balance = 0L;
 
     @Column(name = "frozen_amount", nullable = false)
-    private Long frozenAmount;
+    @Builder.Default
+    private Long frozenAmount = 0L;
 
     @Version
     @Column(name = "version", nullable = false)
@@ -31,10 +46,15 @@ public class Wallet {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public Wallet() {}
+    @PrePersist
+    void prePersist() {
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
 
-    public Long getPlayerId()     { return playerId; }
-    public Long getBalance()      { return balance; }
-    public Long getFrozenAmount() { return frozenAmount; }
-    public Long getVersion()      { return version; }
+    @PreUpdate
+    void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 }
