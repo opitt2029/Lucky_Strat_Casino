@@ -11,6 +11,19 @@ const transactionLabels = {
   gift: '贈送',
 }
 
+const TEST_ACCOUNT = {
+  password: 'test1234',
+  player: {
+    id: 'test-player',
+    username: 'test',
+    email: 'test@example.com',
+    nickname: '測試玩家',
+    avatarUrl: '',
+    consecutiveCheckInDays: 0,
+    lastCheckInDate: null,
+  },
+}
+
 function wait(ms = 420) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms)
@@ -70,9 +83,17 @@ function createInitialDb() {
         password: 'demo-password',
         player,
       },
+      {
+        password: TEST_ACCOUNT.password,
+        player: { ...TEST_ACCOUNT.player },
+      },
     ],
     wallets: {
       [player.id]: {
+        balance: 50000,
+        frozenAmount: 0,
+      },
+      [TEST_ACCOUNT.player.id]: {
         balance: 50000,
         frozenAmount: 0,
       },
@@ -83,20 +104,74 @@ function createInitialDb() {
         makeTransaction('bet', -100, '百家樂下注', 'settled'),
         makeTransaction('task', 10000, '任務獎勵', 'settled'),
       ],
+      [TEST_ACCOUNT.player.id]: [makeTransaction('task', 50000, '測試帳號啟動金', 'settled')],
     },
     friends: {
       [player.id]: [
         { id: 'friend-1', username: 'Nova', nickname: 'Nova', balance: 98200, avatarUrl: '' },
         { id: 'friend-2', username: 'AceLin', nickname: 'AceLin', balance: 87400, avatarUrl: '' },
       ],
+      [TEST_ACCOUNT.player.id]: [],
     },
-    ranks: createRankRows(),
+    ranks: [{ id: TEST_ACCOUNT.player.id, name: TEST_ACCOUNT.player.nickname, nickname: TEST_ACCOUNT.player.nickname, score: 50000, trend: '+0%' }, ...createRankRows()],
   }
+}
+
+function ensureTestAccount(db) {
+  let changed = false
+  db.users = db.users || []
+  db.wallets = db.wallets || {}
+  db.transactions = db.transactions || {}
+  db.friends = db.friends || {}
+  db.ranks = db.ranks || []
+
+  let user = db.users.find((item) => item.player?.username === TEST_ACCOUNT.player.username)
+  if (!user) {
+    user = {
+      password: TEST_ACCOUNT.password,
+      player: { ...TEST_ACCOUNT.player },
+    }
+    db.users.push(user)
+    changed = true
+  }
+
+  if (user.password !== TEST_ACCOUNT.password) {
+    user.password = TEST_ACCOUNT.password
+    changed = true
+  }
+
+  user.player = { ...TEST_ACCOUNT.player, ...user.player, username: TEST_ACCOUNT.player.username, id: TEST_ACCOUNT.player.id }
+  if (!db.wallets[TEST_ACCOUNT.player.id]) {
+    db.wallets[TEST_ACCOUNT.player.id] = { balance: 50000, frozenAmount: 0 }
+    changed = true
+  }
+
+  if (!db.transactions[TEST_ACCOUNT.player.id]) {
+    db.transactions[TEST_ACCOUNT.player.id] = [makeTransaction('task', 50000, '測試帳號啟動金', 'settled')]
+    changed = true
+  }
+
+  if (!db.friends[TEST_ACCOUNT.player.id]) {
+    db.friends[TEST_ACCOUNT.player.id] = []
+    changed = true
+  }
+
+  if (!db.ranks.some((row) => row.id === TEST_ACCOUNT.player.id)) {
+    db.ranks.unshift({ id: TEST_ACCOUNT.player.id, name: TEST_ACCOUNT.player.nickname, nickname: TEST_ACCOUNT.player.nickname, score: 50000, trend: '+0%' })
+    changed = true
+  }
+
+  return changed
 }
 
 function getDb() {
   const existing = readJson(DB_KEY, null)
-  if (existing) return existing
+  if (existing) {
+    if (ensureTestAccount(existing)) {
+      writeJson(DB_KEY, existing)
+    }
+    return existing
+  }
   const db = createInitialDb()
   writeJson(DB_KEY, db)
   return db

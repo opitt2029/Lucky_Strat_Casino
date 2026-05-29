@@ -5,7 +5,7 @@ const fallbackRows = [
   { name: 'Mika', score: 69000, trend: '+3%' },
 ]
 
-export default function LeaderboardPanel({ rows = fallbackRows, myNickname = '', limit = 100 }) {
+export default function LeaderboardPanel({ rows = fallbackRows, myNickname = '', limit = 10 }) {
   const displayRows = rows.length ? rows : fallbackRows
 
   return (

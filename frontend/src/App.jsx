@@ -1,20 +1,27 @@
+<<<<<<< Updated upstream
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { fetchProfile } from './store/slices/authSlice'
+=======
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { useSelector } from 'react-redux'
+>>>>>>> Stashed changes
 
-import Login from './pages/Login'
-import Register from './pages/Register'
+import Home from './pages/Home'
+import Member from './pages/Member'
 import Lobby from './pages/Lobby'
 import SlotGame from './pages/SlotGame'
 import Baccarat from './pages/Baccarat'
 import Rank from './pages/Rank'
 import Profile from './pages/Profile'
 import Transactions from './pages/Transactions'
+import CasinoShop from './pages/CasinoShop'
 
 function PrivateRoute({ children }) {
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated)
-  return isAuthenticated ? children : <Navigate to="/login" replace />
+  const location = useLocation()
+  return isAuthenticated ? children : <Navigate to="/member" replace state={{ from: location }} />
 }
 
 export default function App() {
@@ -32,12 +39,14 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Public routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/member" element={<Member />} />
+        <Route path="/login" element={<Navigate to="/member?mode=login" replace />} />
+        <Route path="/register" element={<Navigate to="/member?mode=register" replace />} />
 
         {/* Protected routes */}
         <Route
-          path="/"
+          path="/games"
           element={
             <PrivateRoute>
               <Lobby />
@@ -57,6 +66,14 @@ export default function App() {
           element={
             <PrivateRoute>
               <Baccarat />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/shop"
+          element={
+            <PrivateRoute>
+              <CasinoShop />
             </PrivateRoute>
           }
         />

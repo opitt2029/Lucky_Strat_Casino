@@ -23,6 +23,39 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+.theme-background,
+.theme-artwork {
+  background-color: var(--theme-bg-color, #09090b);
+  background-image: var(--theme-bg-overlay, none), var(--theme-bg-image, none),
+    var(--theme-bg-accent, none);
+  background-position: center, var(--theme-bg-position, center), center;
+  background-repeat: no-repeat;
+  background-size: cover, var(--theme-bg-size, cover), cover;
+}
+
+.theme-background {
+  min-height: 100vh;
+  background-attachment: fixed, fixed, fixed;
+}
+
+.scroll-sections {
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+}
+
+.scroll-section {
+  min-height: 100vh;
+  scroll-snap-align: start;
+}
+
+.decorative-asset {
+  background-color: #18181b;
+  background-image: var(--decorative-overlay, none), var(--decorative-image, none);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
 @keyframes reel-blur {
   0% {
     transform: translateY(-18px);

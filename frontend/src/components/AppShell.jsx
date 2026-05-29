@@ -6,11 +6,12 @@ import { logoutMember } from '../store/slices/authSlice'
 import { clearNotifications } from '../store/slices/gameSlice'
 import { fetchRanks } from '../store/slices/rankSlice'
 import { fetchWallet } from '../store/slices/walletSlice'
+import { getBackgroundStyle } from '../theme/backgroundTheme'
 
 const navItems = [
-  { to: '/', label: '遊戲大廳' },
-  { to: '/game/slot', label: '老虎機' },
-  { to: '/game/baccarat', label: '百家樂' },
+  { to: '/', label: '首頁' },
+  { to: '/games', label: '遊戲大全' },
+  { to: '/shop', label: '賭場商城' },
   { to: '/rank', label: '排行榜' },
   { to: '/transactions', label: '交易紀錄' },
   { to: '/profile', label: '會員中心' },
@@ -35,11 +36,11 @@ export default function AppShell({ children }) {
   }, [dispatch])
 
   const handleLogout = () => {
-    dispatch(logoutMember()).finally(() => navigate('/login'))
+    dispatch(logoutMember()).finally(() => navigate('/member'))
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-50">
+    <div className="theme-background min-h-screen text-zinc-50" style={getBackgroundStyle('app')}>
       <ErrorBoundary>
         <Suspense fallback={null}>
           <RealtimeBridge />

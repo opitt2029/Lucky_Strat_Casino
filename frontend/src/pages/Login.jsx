@@ -5,12 +5,13 @@ import { Link, useNavigate } from 'react-router-dom'
 import { loginMember } from '../store/slices/authSlice'
 import { fetchRanks } from '../store/slices/rankSlice'
 import { fetchWallet } from '../store/slices/walletSlice'
+import { getBackgroundStyle } from '../theme/backgroundTheme'
 
 export default function Login() {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const { loading, error } = useSelector((state) => state.auth)
-  const [form, setForm] = useState({ username: 'frontend-owner', password: 'demo-password' })
+  const [form, setForm] = useState({ username: 'test', password: 'test1234' })
 
   const handleChange = (event) => {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }))
@@ -22,20 +23,23 @@ export default function Login() {
       await dispatch(loginMember(form)).unwrap()
       dispatch(fetchWallet())
       dispatch(fetchRanks())
-      navigate('/')
+      navigate('/games')
     } catch {
       // authSlice already exposes the message in state.error
     }
   }
 
   return (
-    <div className="grid min-h-screen bg-zinc-950 text-white lg:grid-cols-[1fr_520px]">
-      <section className="flex min-h-[46vh] items-end border-b border-white/10 bg-black p-6 sm:p-10 lg:min-h-screen lg:border-b-0 lg:border-r">
+    <div className="theme-background grid min-h-screen text-white lg:grid-cols-[1fr_520px]" style={getBackgroundStyle('auth')}>
+      <section
+        className="theme-artwork flex min-h-[46vh] items-end border-b border-white/10 p-6 sm:p-10 lg:min-h-screen lg:border-b-0 lg:border-r"
+        style={getBackgroundStyle('authHero')}
+      >
         <div className="max-w-3xl">
           <p className="text-xs font-black uppercase tracking-[0.35em] text-zinc-500">Lucky Star Casino</p>
           <h1 className="mt-4 text-4xl font-black tracking-tight sm:text-6xl">黑白系遊戲前端工作台</h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-400">
-            React 18、Vite、Tailwind CSS、Redux Toolkit、API 與 WebSocket 基底已整合，適合用來逐步接上後端服務與遊戲動畫。
+            React 18、Vite、Tailwind CSS、Redux Toolkit、API 與 WebSocket 基底已整合。測試帳號為 test / test1234。
           </p>
         </div>
       </section>

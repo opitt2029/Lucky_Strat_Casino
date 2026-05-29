@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { useNavigate } from 'react-router-dom'
 import { registerMember } from '../store/slices/authSlice'
 import { fetchWallet } from '../store/slices/walletSlice'
+import { getBackgroundStyle } from '../theme/backgroundTheme'
 
 export default function Register() {
   const dispatch = useDispatch()
@@ -25,14 +26,14 @@ export default function Register() {
     try {
       await dispatch(registerMember(form)).unwrap()
       dispatch(fetchWallet())
-      navigate('/')
+      navigate('/games')
     } catch {
       // authSlice already exposes the message in state.error
     }
   }
 
   return (
-    <div className="grid min-h-screen place-items-center bg-zinc-950 px-4 py-10 text-white">
+    <div className="theme-background grid min-h-screen place-items-center px-4 py-10 text-white" style={getBackgroundStyle('auth')}>
       <div className="w-full max-w-xl rounded border border-white/10 bg-zinc-900 p-6">
         <p className="text-xs font-black uppercase tracking-[0.3em] text-zinc-500">Register</p>
         <h1 className="mt-3 text-3xl font-black">建立會員基底</h1>
