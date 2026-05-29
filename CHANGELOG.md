@@ -5,6 +5,296 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [feat] — 2026-05-29 — Kafka→MySQL 讀端同步（補 T-025 流水查詢資料來源）
+
+### Added
+- `backend/wallet-service/.../kafka/WalletReadSyncListener.java`（新增）：消費 `wallet.debit`/`wallet.credit` 事件，把每筆交易寫入 MySQL 讀庫 `wallet_transactions`（經 `WalletTransactionViewRepository`），讓 `GET /api/v1/wallet/transactions`（T-025）回傳真實流水。
+  - `onDebit`：寫入 `type=DEBIT`、`subType=BET`；`onCredit`：寫入 `type=CREDIT`、`subType=event.subType()`（WIN/CHECKIN/TASK/GIFT/GM_REWARD/BANKRUPTCY_AID）。
+  - 冪等：以讀庫主鍵 `existsById(transactionId)` 檢查，重送即略過寫入仍 ack（Kafka at-least-once 安全）。
+  - 每個 handler 個別標註 `@Transactional(transactionManager = "mysqlTransactionManager")`（不在類別層級，避免干擾 Kafka listener proxy）；成功 `save` 後才 `ack.acknowledge()`。
+- 測試（新增）：`kafka/WalletReadSyncListenerTest.java`（7 案，`@ExtendWith(MockitoExtension.class)`、真實 `ObjectMapper`）：debit/credit 正常同步、冪等跳過重送、JSON 格式錯誤往外拋不 ack、`DataAccessException` 往外拋不 ack。
+
+### Why
+- T-025 查詢 API 先前讀的是空的 MySQL 讀庫；需要事件驅動的同步管線把 PostgreSQL 寫端結果投影到讀端（ADR-001 CQRS、最終一致）。
+- ⚠️ ADR-002 地雷：本 listener **只消費事件 `wallet.debit`/`wallet.credit`，絕不消費指令 `wallet.credit.request`**——在 wallet-service 內消費指令會形成「再入帳→再發指令」的無限迴圈。
+- 錯誤處理沿用既有 `KafkaConsumerConfig`：`JsonProcessingException` 不可重試直送 `<topic>.DLT`；暫時性失敗往外拋、不 ack，重試 3 次耗盡後送 DLT。
+
+### How（如何驗證）
+- `mvn -pl backend/wallet-service test`（單元測試以 Mockito 驗證 save/ack 行為與冪等、不可重試/可重試例外路徑；listener 不需外部 Kafka）。
+
+---
+
+## [feat] — 2026-05-29 — 帳務流水查詢 API（T-025，CQRS MySQL 讀端）
+
+### Added
+- `backend/wallet-service/.../mysql/entity/WalletTransactionView.java`（新增）：MySQL 讀庫 `wallet_transactions` 唯讀視圖，由 `mysqlEntityManagerFactory` 管理（ADR-001 CQRS 讀端）。
+- `backend/wallet-service/.../mysql/repository/WalletTransactionViewRepository.java`（新增）：`search(...)` JPQL 查詢，支援 playerId + 可選類型 + 可選日期區間 + 分頁（null 即略過該條件）。
+- `backend/wallet-service/.../service/WalletQueryService.java`（新增）：讀端查詢服務，固定 `@Transactional(readOnly=true, transactionManager="mysqlTransactionManager")`，排序 createdAt DESC, id DESC。
+- `backend/wallet-service/.../dto/WalletTransactionResponse.java`、`common/PagedResponse.java`（新增）：對外回傳 DTO 與穩定分頁格式（不直接序列化 Spring `Page`）。
+- 測試（新增）：`controller/WalletTransactionsControllerTest.java`（10 案）、`service/WalletQueryServiceTest.java`（3 案）。
+
+### Changed
+- `backend/wallet-service/.../controller/WalletController.java`：新增 `GET /api/v1/wallet/transactions`，支援 `page/size`（size 上限 100）、`type`（DEBIT/CREDIT/BONUS，大小寫不敏感）、`from/to`（ISO yyyy-MM-dd，涵蓋整個 to 當日）；玩家身分取自 `X-User-Id` header；參數錯誤回 400。
+- `backend/wallet-service/.../config/DataSourceConfig.java`：MySQL EMF 的 `hibernate.hbm2ddl.auto` 由硬編 `validate` 改為與寫端共用組態來源（system property `jpa.ddl-auto` → env `JPA_DDL_AUTO` → 預設 `validate`），讓測試（surefire `jpa.ddl-auto=create`）能在 H2 自動建讀庫表；正式環境仍 `validate`。
+- `backend/wallet-service/.../exception/GlobalExceptionHandler.java`：新增 `MethodArgumentTypeMismatchException` → 400 處理（例如 `from/to` 日期格式錯誤、`page/size` 非數字）。
+
+### Why
+- T-025 要求帳務流水查詢走 MySQL 讀庫（ADR-001 CQRS 讀寫分離），與扣款/入帳（PostgreSQL 寫端）解耦，避免查詢與寫入鎖競爭。
+- 讀端視圖不含 `idempotency_key` 等冪等控制欄位，僅暴露查詢所需欄位；分頁採固定 schema 避免前端依賴 Spring `Page` 不穩定結構。
+
+### How（如何驗證）
+- `mvn -pl backend/wallet-service test` → **BUILD SUCCESS，Tests run: 51, Failures: 0, Errors: 0**（含本次新增 13 個單元測試，及 `contextLoads` 驗證新增 MySQL 實體後雙 EMF 仍正常啟動）。
+
+---
+
+## [docs] — 2026-05-29 — AI 開發前必讀（AGENTS.md/CLAUDE.md）+ CHANGELOG 單一來源約定
+
+### Added
+- `AGENTS.md`（新增）：AI / 自動化代理開發前必讀的 primer —— 必讀文件清單、10 條已知地雷、約定速查、CHANGELOG 規則、驗證指令。跨工具通用。
+- `CLAUDE.md`（新增）：精簡指標，以 `@AGENTS.md` 帶入完整內容 + Claude Code 專屬補充（內容只維護 AGENTS.md 一份，避免漂移）。
+
+### Changed
+- `CONTRIBUTING.md`：新增 §6「CHANGELOG 更新規則」—— 確立**根目錄 `./CHANGELOG.md` 為單一真相來源**、何時更新、條目格式。
+- `backend/member-service/CHANGELOG.md`：頂部加凍結註記，標明已凍結為歷史、新條目改寫根目錄。
+
+### Why
+- 新 AI / 新組員缺乏一致的上下文起點，重複踩同樣的雷（如 `./mvnw` 不存在、必填環境變數、雙資料源、ADR-002 迴圈）。
+- 原本同時存在根目錄與 member-service 兩份 CHANGELOG 且只有 member 被維護，造成「該更新哪份」的模糊；統一為根目錄一份降低維護成本與脫節風險。
+
+---
+
+## [feat] — 2026-05-29 — ADR-002 wallet.credit 指令/事件分離，串通簽到入帳（T-017/T-018）
+
+### Decision
+
+- `docs/adr/ADR-002.md`（新增）：拍板 `wallet.credit` 事件契約，**分離「入帳指令」與「入帳事件」**：
+  - `wallet.credit.request`（指令）：member 等發出「請入帳」，wallet 消費後真正加餘額。
+  - `wallet.credit`（事件）：wallet 入帳後發出「已入帳」，供 rank/notification 消費。
+  - wallet-service **永不消費** `wallet.credit`（避免自我迴圈）。
+
+### Added
+
+- `backend/wallet-service/.../kafka/WalletCreditRequestEvent.java`、`WalletCreditRequestListener.java`（新增）
+  - 消費 `wallet.credit.request` → 組 `CreditRequest` → 呼叫既有 `WalletService.credit()`（重用 T-023）→ 成功才 ack。手動 ack、失敗進 DLT。
+- `backend/wallet-service/.../kafka/WalletCreditRequestListenerTest.java`（新增）：3 個單元測試（正常入帳 / 格式錯誤不 ack / credit 失敗不 ack）。
+
+### Changed
+
+- `kafka/kafka-init.sh`：新增 topic `wallet.credit.request` 與 `wallet.credit.request.DLT`，並補上指令/事件語意註解。
+- `backend/member-service/.../service/CheckinService.java`、`NewGiftService.java`：outbox 發布 topic 由 `wallet.credit` 改為 `wallet.credit.request`（payload 不變）。
+- 對應更新 `CheckinServiceTest`、`NewGiftServiceTest` 的 topic 斷言。
+- `backend/wallet-service/.../kafka/WalletCreditEvent.java`：更新架構備註對齊 ADR-002。
+
+### Result
+
+- ✅ **T-017 簽到入帳 / T-018 新手禮入帳鏈路接通**：member 發指令 → wallet 消費入帳 → 發事件。先前因「無 consumer」而斷裂的問題解除。
+
+### Verified
+
+- `mvn -pl backend/member-service,backend/wallet-service test` → **member 69 + wallet 32 全綠，BUILD SUCCESS**（含新 consumer 測試與 wallet contextLoads 載入該 bean）。
+
+### Note
+
+- ⚠️ 本次在 wallet-service 的實作與 Wei Yu 上傳的 T-023 可能重疊，**需與 Wei Yu 協調合併**（擇一為準或將 consumer 疊加到其分支）。
+- rank-service（T-040）實作時請消費 `wallet.credit`/`wallet.debit`（事件），勿消費 `wallet.credit.request`（指令）。
+
+---
+
+## [feat] — 2026-05-29 — Wallet 派彩入帳 API（T-023）+ 啟動修復 + 後端 CI 擋關
+
+### Added
+
+- `backend/wallet-service/.../dto/CreditRequest.java`、`CreditResponse.java`（新增）
+  - 入帳請求 / 回應 DTO，與 debit 對稱。`CreditRequest` 含 `subType`（限 WIN/CHECKIN/TASK/GIFT/GM_REWARD/BANKRUPTCY_AID）、`idempotencyKey`、選填 `unfreezeAmount`（解凍）。
+- `backend/wallet-service/.../kafka/WalletCreditEvent.java`（新增）
+  - 入帳完成事件（發布到 `wallet.credit`），含架構備註：禁止在 wallet-service 內新增 `wallet.credit` consumer，否則與本事件形成無限迴圈（詳見 `docs/_TMP_wallet-credit-架構決策筆記.md`）。
+- `backend/wallet-service/.../service/WalletService#credit()`（新增方法）
+  - 冪等檢查 → 載入錢包 → 加餘額 +（選填）解凍 → 樂觀鎖存檔 → 寫 `wallet_transactions`（type=CREDIT）→ 發 `wallet.credit` 事件。結構對稱於 `debit()`，含並發 UNIQUE 衝突回查與樂觀鎖 409 處理。
+- `backend/wallet-service/.../controller/InternalWalletController`：新增 `POST /internal/wallet/credit`。
+- `backend/wallet-service/.../service/WalletServiceCreditTest.java`（新增）：7 個單元測試（含解凍、解凍守衛、冪等、並發、樂觀鎖、查無錢包）。
+
+### Fixed
+
+- `backend/wallet-service/.../config/KafkaConsumerConfig.java`
+  - **修復 wallet-service 無法啟動的 bug**：移除重複的 `kafkaErrorHandler` @Bean（Spring Boot 3.2+ 同名 @Bean 會丟 `BeanDefinitionParsingException` 導致 context 無法載入）。等同套用未合併分支 `fix/wallet-service-t020-t021-review` 的 `2b074dd`。
+  - 驗證：`WalletServiceApplicationTests.contextLoads` 由「啟動失敗」轉為通過。
+
+### Changed
+
+- `backend/wallet-service/pom.xml`：新增 H2（test scope）與 surefire `jpa.ddl-auto=create`，讓 `@SpringBootTest` 用記憶體資料庫啟動（比照 member-service）。
+- `backend/wallet-service/src/test/resources/application.yml`：雙資料源改指向 H2（PostgreSQL / MySQL 相容模式），使 contextLoads 不需外部 DB。
+- `.github/workflows/ci.yml`：**新增 `backend-test` job**，PR 到 main/develop 時對 gateway/member/wallet 跑 `mvn clean test`（用 H2，無需外部基礎設施）。這正是先前漏掉、導致 wallet 啟動 bug 溜進 develop 的擋關規則。
+
+### Verified
+
+- `mvn -pl backend/gateway-service,backend/member-service,backend/wallet-service test` → 三服務皆 **BUILD SUCCESS**（member 69、wallet 29 含 contextLoads、gateway 通過）。
+
+### Note
+
+- ⚠️ **T-017 簽到入帳仍未串通**：member 發 `wallet.credit` 作為「請入帳」指令，但 wallet 端尚未消費（避免與本次新增的事件發布形成迴圈）。需先拍板 `wallet.credit` topic 語意（見決策筆記）才能補上 consumer。本次 T-023 僅交付 HTTP 入帳端點，未處理該架構決策。
+- ⚠️ 需在 GitHub 設定 **branch protection**，將 `backend-test` 設為必過檢查，CI 才真正能「擋」住合併（workflow 本身只負責執行）。
+
+---
+
+## [progress] — 2026-05-29 — 全專案進度盤點與未完成事項標記
+
+> 依據 `docs/幸運星幣城_工作分配表.xlsx`（T-000~T-107，共 78 項）逐一比對實際程式碼。
+> 完整逐項狀態與盤點依據見 `AUDIT_REPORT.md` 附錄 A。
+> 統計：✅ 已完成 24 項（~31%）、⚠️ 部分完成 11 項（~14%）、❌ 未開始 42 項（~54%）、❓ 待確認 1 項。
+
+### Done（已完成主線）
+
+- **全域基礎建設**：T-000 Repo/分支、T-001 架構/ADR-001、T-003 服務初始化、T-004 前端初始化、T-005 Kafka Topic、T-006 DB Schema。
+- **Member Service**：T-010 註冊、T-011 登入/登出、T-012 Token 刷新、T-013 Security、T-014 個人資料、T-015 好友、T-016 任務結構、T-018 新手禮包。
+- **Gateway**：T-060 路由、T-061 JWT 過濾器、T-062 速率限制、T-063 熔斷。
+- **前端骨架**：T-080 登入/註冊、T-081 Redux、T-082 大廳。
+
+### TODO — 未完成事項（依優先級）
+
+#### 🔴 P0 — 核心功能缺口（阻擋產品成形）
+
+- [x] **T-023 派彩入帳 API（wallet credit）**（2026-05-29 完成）— `POST /internal/wallet/credit` 已實作（冪等/樂觀鎖/解凍/發 wallet.credit）。⚠️ 但 **T-017 簽到入帳仍未串通**：wallet 尚未消費 member 發的 wallet.credit 指令（待 topic 語意拍板，見 `docs/_TMP_wallet-credit-架構決策筆記.md`）。
+- [ ] **T-030~T-033 老虎機核心**（組員B）— RNG 引擎、遊戲邏輯、Spin API、Redis Session：game-service 僅有啟動類，**整個服務未開始**。
+- [ ] **T-040~T-042 排行榜核心**（組員D）— ZSet 全服榜、好友榜、查詢 API：rank-service 僅有啟動類。
+- [ ] **T-025 帳務流水查詢 API**（組員C）。
+- [ ] **T-090 JMeter 壓測腳本、T-091 帳務一致性對帳腳本、T-093 E2E 整合測試**（組員D / 全員）。
+- [ ] **T-100~T-104 鑽石系統 P0**（資料表 / 開戶 / 序號兌換 / 鑽石換星幣 / 查餘額）— 全數未實作。
+
+#### 🟠 P1 — 重要功能
+
+- [ ] **T-026 好友星幣贈送、T-027 破產補助**（組員C）。
+- [ ] **T-034~T-036 百家樂邏輯/API、RNG 公平性驗證**（組員B）。
+- [ ] **T-043 每週排行榜重置、T-044 每日持幣快照**（組員D）。
+- [ ] **T-050~T-053 Admin 後台**（JWT 角色、玩家管理、流通量報表、RTP 儀表板）— admin-service 僅有 datasource 骨架。
+- [ ] **T-070~T-073 Notification Service**（組員D）— **backend 無 notification-service 模組**，WebSocket 推播整段缺失。
+- [ ] **T-085~T-088 前端**（排行榜/帳務/百家樂/個人資料）UI 存在但**多依賴未實作後端 API**，真實串接未完成。
+- [ ] **T-092 Swagger UI**（各服務無 springdoc 依賴）。
+- [ ] **T-105~T-107 鑽石系統 P1**（後台序號生成/查詢、前端鑽石頁面）。
+
+#### ⚪ P2 / 收尾
+
+- [ ] **T-028 Wallet DLT Admin 查詢/重試 API**（DLT topic 已建，管理端未做）。
+- [ ] **T-037 遊戲 RTP 統計、T-045 今日贏幣王榜、T-054 異常玩家偵測、T-055 GM 發幣工具**。
+- [ ] **T-089 RWD 響應式優化**（待實機驗證三斷點）。
+- [x] **T-094 DEPLOY.md**（2026-05-29 完成本機部署 SOP）。剩 **T-095 ADR-002~005、T-096 結業簡報/Demo 影片**。
+
+### 已知偏離 / 風險標記
+
+- ⚠️ **T-002 偏離規格**：docker-compose 使用 **Zookeeper** 模式，規格表要求 **KRaft（無 Zookeeper）**，需確認是否為刻意決策。
+- ⚠️ **範圍膨脹**：鑽石系統 T-100~T-107 已寫入任務表（git 有 `docs/diamond-system-tasks`）但**零程式碼產出**。
+- ⚠️ **未完成的後端服務佔 4 個**：game / rank / admin / notification，等同賭場營利核心尚未起步。
+- ✅ 測試狀態（2026-05-29 驗證）：member-service 全套件 `mvn test` → **69 個測試全綠**；AUDIT 先前記載的「測試引用不存在方法、編譯失敗」已不成立（測試早已對齊 source）。
+
+---
+
+## [feat] — 2026-05-29 — Gateway Circuit Breaker 熔斷降級（T-063）
+
+### Added
+
+- `backend/gateway-service/src/main/java/com/luckystar/gateway/dto/ApiResponse.java`（新增）
+  - Gateway 本地統一 API 回應格式 record：`boolean success`、`Object data`、`String message`。
+  - 僅供 gateway-service 內部使用，不與下游服務共用。
+
+- `backend/gateway-service/src/main/java/com/luckystar/gateway/controller/FallbackController.java`（新增）
+  - `@RestController`，處理 `GET|POST /fallback/{service}`。
+  - 從 exchange attribute `CIRCUITBREAKER_EXECUTION_EXCEPTION_ATTR` 讀取觸發熔斷的例外：
+    - `CallNotPermittedException`（熔斷開路）→ 回傳「請稍後再試」友善訊息。
+    - 其他例外（連線逾時等）→ 回傳通用服務不可用訊息。
+  - 固定回傳 HTTP 503，Content-Type: application/json，不暴露熔斷狀態（OPEN/HALF_OPEN/CLOSED）。
+
+### Modified
+
+- `backend/gateway-service/pom.xml`
+  - 新增 `spring-cloud-starter-circuitbreaker-reactor-resilience4j`（BOM 管理，無需指定版本）。
+  - 說明：Spring Cloud Gateway 是 reactive 應用，需 `reactor-resilience4j` 而非普通版；後者缺少 `resilience4j-reactor` 傳遞依賴，`ReactiveResilience4JAutoConfiguration` 的 `@ConditionalOnClass(CircuitBreakerOperator.class)` 不成立，導致 `CircuitBreaker` filter factory 無法被 Gateway 發現。
+
+- `backend/gateway-service/src/main/resources/application.yml`
+  - **所有 7 條路由**新增 `CircuitBreaker` filter（instance 對應關係如下）：
+
+    | 路由 | instance name | fallbackUri |
+    |------|--------------|-------------|
+    | member-auth、member-player、member-checkin | `member-service` | `forward:/fallback/member` |
+    | wallet | `wallet-service` | `forward:/fallback/wallet` |
+    | game | `game-service` | `forward:/fallback/game` |
+    | rank | `rank-service` | `forward:/fallback/rank` |
+    | admin | `admin-service` | `forward:/fallback/admin` |
+
+  - 新增 `resilience4j.circuitbreaker.instances` 區塊，5 個服務共用相同參數：
+    - `failure-rate-threshold: 50`（失敗率 > 50% 觸發熔斷）
+    - `slow-call-rate-threshold: 80 / slow-call-duration-threshold: 3s`
+    - `sliding-window-type: COUNT_BASED / sliding-window-size: 10 / minimum-number-of-calls: 5`
+    - `wait-duration-in-open-state: 10s / permitted-number-of-calls-in-half-open-state: 3`
+    - `automatic-transition-from-open-to-half-open-enabled: true`
+  - `jwt.whitelist` 新增 `/fallback/`，讓 JWT filter 不攔截 Gateway 內部熔斷降級端點。
+
+### Verified
+
+- `mvn test` → `Tests run: 21, Failures: 0, Errors: 0, Skipped: 0`（含 `GatewayServiceApplicationTests.contextLoads` 整合測試）。
+
+### Note
+
+- 降級回應刻意不揭露熔斷狀態，符合安全要求（不讓外部探測服務拓撲）。
+- `/fallback/**` 是 Gateway 自身端點，不對外路由到任何下游服務；JWT 白名單必須包含此路徑，否則熔斷後的 forward 請求本身也會被攔截回 401。
+
+---
+
+## [feat] — 2026-05-29 — Gateway 每玩家速率限制（T-062）
+
+### Added
+
+- `backend/gateway-service/src/main/java/com/luckystar/gateway/config/RateLimitProperties.java`（新增）
+  - `@ConfigurationProperties(prefix = "rate-limit")` record，含內嵌 `Player(replenishRate, burstCapacity)` 與 `Game(replenishRate, burstCapacity)` record。
+  - 對應 application.yml 新增的 `rate-limit.player` / `rate-limit.game` 設定區塊。
+
+- `backend/gateway-service/src/main/java/com/luckystar/gateway/filter/PlayerRateLimitGlobalFilter.java`（新增）
+  - `GlobalFilter, Ordered`，order = `-50`（在 JWT filter `-100` 之後、Gateway 路由轉發 `≥0` 之前）。
+  - 讀取 JWT filter 注入的 `X-User-Id` header 作為計數金鑰，確保一個玩家超限不影響其他人。
+  - 路徑識別：
+    - `/api/v1/game/**` → 套用較嚴格的 `game` 設定（預設 burst 10）
+    - 其他已驗證路徑 → 套用 `player` 設定（預設 burst 20）
+  - Redis 實作（滑動視窗 token bucket）：
+    - `INCR key` → 若計數 = 1 則 `EXPIRE key 1s`（開啟新視窗）
+    - 計數 > burstCapacity → 回傳 HTTP 429，Header `Retry-After: 1`，JSON body `{"success":false,"data":null,"message":"Too many requests"}`
+    - 計數 ≤ burstCapacity → 繼續轉發
+  - Redis 故障採 **fail-open**（記錄 WARN 後放行），與 JWT 黑名單的 fail-closed 策略相反，優先保障可用性。
+  - 白名單路徑（`/api/v1/auth/`、`/actuator/health` 等）與缺少 `X-User-Id` 的請求直接跳過，不查 Redis。
+
+- `backend/gateway-service/src/test/java/com/luckystar/gateway/filter/PlayerRateLimitGlobalFilterTest.java`（新增）
+  - 8 個純單元測試，無 Spring context、直接 mock `ReactiveStringRedisTemplate`：
+
+    | 測試 | 情境 | 預期 |
+    |------|------|------|
+    | whitelistedPath_skipsRateLimit | POST /api/v1/auth/login | redis 不呼叫，chain 放行 |
+    | normalPath_firstRequest_allows | 計數 = 1 | chain 放行，expire(1s) 被呼叫 |
+    | normalPath_withinBurst_allows | 計數 = 20（= burstCapacity） | chain 放行 |
+    | normalPath_exceedsBurst_returns429 | 計數 = 21（> burstCapacity） | HTTP 429，chain 不呼叫 |
+    | gamePath_stricterLimit_exceedsBurst_returns429 | /game/bet，計數 = 11（> 10） | HTTP 429 |
+    | gamePath_withinStrictLimit_allows | /game/bet，計數 = 5（≤ 10） | chain 放行 |
+    | redisError_failOpen_allowsRequest | increment 拋 RuntimeException | chain 放行（fail-open） |
+    | missingUserId_skipsRateLimit | 無 X-User-Id header | redis 不呼叫，chain 放行 |
+
+### Modified
+
+- `backend/gateway-service/src/main/java/com/luckystar/gateway/filter/FilterOrder.java`
+  - 新增常數 `PLAYER_RATE_LIMIT = -50`，更新類別 Javadoc 的執行鏈說明。
+
+- `backend/gateway-service/src/main/java/com/luckystar/gateway/GatewayServiceApplication.java`
+  - `@EnableConfigurationProperties` 陣列加入 `RateLimitProperties.class`。
+
+- `backend/gateway-service/src/main/resources/application.yml`
+  - 根層新增 `rate-limit.player`（replenish 10，burst 20）與 `rate-limit.game`（replenish 5，burst 10）設定區塊，支援環境變數覆寫（`PLAYER_RATE_LIMIT_REPLENISH` 等）。
+
+### Verified
+
+- `mvn -Dtest=PlayerRateLimitGlobalFilterTest test` → `Tests run: 8, Failures: 0, Errors: 0`。
+
+### Note
+
+- Filter 執行順序：`RATE_LIMIT(-200，IP 限流)` → `JWT_AUTHENTICATION(-100)` → **`PLAYER_RATE_LIMIT(-50，本任務)`** → 路由轉發。
+- order = -50 是設計必要條件：order -200 執行時 JWT filter 尚未注入 `X-User-Id`，若放在 -200 永遠讀不到 userId。
+
+---
+
 ## [feat] — 2026-05-28 — 錢包餘額/簽到前後端串接 + Gateway 簽到路由修復（FIX-5）
 
 ### Fixed
