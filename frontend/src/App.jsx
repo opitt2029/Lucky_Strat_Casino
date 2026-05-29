@@ -1,12 +1,7 @@
-<<<<<<< Updated upstream
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { fetchProfile } from './store/slices/authSlice'
-=======
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { useSelector } from 'react-redux'
->>>>>>> Stashed changes
 
 import Home from './pages/Home'
 import Member from './pages/Member'

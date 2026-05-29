@@ -37,8 +37,8 @@ export default function SlotGame() {
             value={result ? `${result.payout.toLocaleString()}` : '-'}
             caption={result?.game === 'slot' ? `${result.multiplier}x / ${result.roundId}` : '等待本局結果'}
           />
-          <div className="rounded border border-white/10 bg-zinc-900 p-4">
-            <p className="text-xs font-black uppercase tracking-[0.25em] text-zinc-500">Bet</p>
+          <div className="luxury-panel-soft rounded p-4">
+            <p className="gold-muted text-xs font-black uppercase tracking-[0.25em]">Bet</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {betOptions.map((option) => (
                 <button
@@ -48,8 +48,8 @@ export default function SlotGame() {
                   className={[
                     'min-h-12 rounded border px-3 text-sm font-black transition',
                     selectedBet === option
-                      ? 'border-white bg-white text-zinc-950'
-                      : 'border-white/10 bg-black text-zinc-300 hover:border-white hover:text-white',
+                      ? 'gold-button'
+                      : 'border-yellow-200/15 bg-red-950/70 text-yellow-100/68 hover:border-yellow-200/60 hover:text-yellow-100',
                   ].join(' ')}
                 >
                   {option === 'MAX' ? 'MAX' : option.toLocaleString()}
@@ -62,7 +62,7 @@ export default function SlotGame() {
             type="button"
             onClick={handleSpinRound}
             disabled={loading || balance < resolvedBet}
-            className="rounded bg-white px-5 py-4 text-sm font-black text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
+            className="gold-button rounded px-5 py-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? 'SPINNING...' : 'SPIN'}
           </button>

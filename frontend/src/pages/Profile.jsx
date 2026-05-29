@@ -81,29 +81,29 @@ export default function Profile() {
   return (
     <AppShell>
       <section className="grid gap-4 lg:grid-cols-[0.75fr_0.25fr]">
-        <form onSubmit={handleSave} className="rounded border border-white/10 bg-zinc-900 p-6">
-          <p className="text-xs font-black uppercase tracking-[0.3em] text-zinc-500">Profile</p>
-          <h2 className="mt-3 text-3xl font-black">會員中心</h2>
+        <form onSubmit={handleSave} className="luxury-panel rounded p-6">
+          <p className="gold-muted text-xs font-black uppercase tracking-[0.3em]">Profile</p>
+          <h2 className="brand-title mt-3 text-3xl font-black">會員中心</h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-2 text-sm font-bold text-zinc-300">
+            <label className="grid gap-2 text-sm font-bold text-yellow-100/78">
               玩家 ID
-              <input className="rounded border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-white" value={player?.id || 'demo-player'} readOnly />
+              <input className="rounded border border-yellow-200/15 bg-red-950/70 px-4 py-3 text-white outline-none focus:border-yellow-200" value={player?.id || 'demo-player'} readOnly />
             </label>
-            <label className="grid gap-2 text-sm font-bold text-zinc-300">
+            <label className="grid gap-2 text-sm font-bold text-yellow-100/78">
               暱稱
               <input
                 name="nickname"
-                className="rounded border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-white"
+                className="rounded border border-yellow-200/15 bg-red-950/70 px-4 py-3 text-white outline-none focus:border-yellow-200"
                 value={form.nickname}
                 onChange={handleChange}
                 required
               />
             </label>
-            <label className="grid gap-2 text-sm font-bold text-zinc-300 sm:col-span-2">
+            <label className="grid gap-2 text-sm font-bold text-yellow-100/78 sm:col-span-2">
               Avatar URL
               <input
                 name="avatarUrl"
-                className="rounded border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-white"
+                className="rounded border border-yellow-200/15 bg-red-950/70 px-4 py-3 text-white outline-none focus:border-yellow-200"
                 placeholder="https://example.com/avatar.png"
                 value={form.avatarUrl}
                 onChange={handleChange}
@@ -115,7 +115,7 @@ export default function Profile() {
           <button
             type="submit"
             disabled={authLoading}
-            className="mt-6 rounded bg-white px-5 py-3 text-sm font-black text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
+            className="gold-button mt-6 rounded px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
           >
             {authLoading ? '儲存中...' : '儲存設定'}
           </button>
@@ -124,32 +124,32 @@ export default function Profile() {
         <aside className="grid gap-4 content-start">
           <MetricCard label="可用籌碼" value={wallet.balance.toLocaleString()} caption="walletSlice.balance" tone="light" />
           <MetricCard label="凍結籌碼" value={wallet.frozenAmount.toLocaleString()} caption="下注中保留" />
-          <div className="rounded border border-white/10 bg-zinc-900 p-4">
-            <p className="text-xs font-black uppercase tracking-[0.25em] text-zinc-500">Check-in</p>
-            <p className="mt-2 text-2xl font-black text-white">{player?.consecutiveCheckInDays || 0} 天</p>
-            <div className="mt-4 h-3 overflow-hidden rounded bg-black">
-              <div className="h-full bg-white transition-all" style={{ width: `${progress}%` }} />
+          <div className="luxury-panel-soft rounded p-4">
+            <p className="gold-muted text-xs font-black uppercase tracking-[0.25em]">Check-in</p>
+            <p className="brand-title mt-2 text-2xl font-black">{player?.consecutiveCheckInDays || 0} 天</p>
+            <div className="mt-4 h-3 overflow-hidden rounded bg-red-950/70">
+              <div className="h-full bg-yellow-200 transition-all" style={{ width: `${progress}%` }} />
             </div>
-            <p className="mt-2 text-xs font-bold text-zinc-500">7 天進度獎勵</p>
+            <p className="gold-muted mt-2 text-xs font-bold">7 天進度獎勵</p>
           </div>
         </aside>
       </section>
 
-      <section className="mt-6 rounded border border-white/10 bg-zinc-900 p-6">
+      <section className="luxury-panel-soft mt-6 rounded p-6">
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.3em] text-zinc-500">Friends</p>
-            <h2 className="mt-1 text-2xl font-black text-white">好友列表</h2>
+            <p className="gold-muted text-xs font-black uppercase tracking-[0.3em]">Friends</p>
+            <h2 className="brand-title mt-1 text-2xl font-black">好友列表</h2>
           </div>
           <form onSubmit={handleAddFriend} className="flex gap-2">
             <input
-              className="min-h-11 rounded border border-white/10 bg-black px-4 text-sm font-bold text-white outline-none focus:border-white"
+              className="min-h-11 rounded border border-yellow-200/15 bg-red-950/70 px-4 text-sm font-bold text-white outline-none focus:border-yellow-200"
               placeholder="輸入好友帳號"
               value={friendName}
               onChange={(event) => setFriendName(event.target.value)}
               required
             />
-            <button type="submit" className="rounded bg-white px-4 py-2 text-sm font-black text-zinc-950 transition hover:bg-zinc-200">
+            <button type="submit" className="gold-button rounded px-4 py-2 text-sm font-black transition">
               加好友
             </button>
           </form>
@@ -157,16 +157,16 @@ export default function Profile() {
 
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           {friends.map((friend) => (
-            <div key={friend.id} className="rounded border border-white/10 bg-black p-4">
+            <div key={friend.id} className="rounded border border-yellow-200/15 bg-red-950/70 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-lg font-black text-white">{friend.nickname}</p>
-                  <p className="text-sm font-bold text-zinc-500">{friend.username}</p>
+                  <p className="text-lg font-black text-yellow-100">{friend.nickname}</p>
+                  <p className="gold-muted text-sm font-bold">{friend.username}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleRemoveFriend(friend.id)}
-                  className="rounded border border-white/10 px-3 py-2 text-sm font-bold text-zinc-300 hover:bg-white hover:text-zinc-950"
+                  className="red-gold-button rounded px-3 py-2 text-sm font-bold"
                 >
                   刪除
                 </button>
@@ -176,21 +176,21 @@ export default function Profile() {
                   type="number"
                   min="100"
                   step="100"
-                  className="min-h-11 rounded border border-white/10 bg-zinc-950 px-3 text-sm font-bold text-white outline-none focus:border-white"
+                  className="min-h-11 rounded border border-yellow-200/15 bg-red-950/80 px-3 text-sm font-bold text-white outline-none focus:border-yellow-200"
                   value={giftAmount}
                   onChange={(event) => setGiftAmount(event.target.value)}
                 />
                 <button
                   type="button"
                   onClick={() => handleGift(friend.id)}
-                  className="rounded bg-white px-4 py-2 text-sm font-black text-zinc-950 transition hover:bg-zinc-200"
+                  className="gold-button rounded px-4 py-2 text-sm font-black transition"
                 >
                   贈送
                 </button>
               </div>
             </div>
           ))}
-          {friends.length === 0 && <p className="rounded border border-white/10 bg-black p-5 text-sm font-bold text-zinc-500">目前尚無好友</p>}
+          {friends.length === 0 && <p className="rounded border border-yellow-200/15 bg-red-950/70 p-5 text-sm font-bold text-yellow-100/56">目前尚無好友</p>}
         </div>
       </section>
     </AppShell>

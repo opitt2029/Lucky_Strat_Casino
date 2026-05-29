@@ -24,9 +24,9 @@ export default function Rank() {
     <AppShell>
       <section className="grid gap-4 lg:grid-cols-[1fr_340px]">
         <div className="grid gap-4">
-          <section className="rounded border border-white/10 bg-zinc-900 p-4">
+          <section className="luxury-panel-soft rounded p-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="flex rounded border border-white/10 bg-black p-1">
+              <div className="flex rounded border border-yellow-200/15 bg-red-950/70 p-1">
                 {[
                   ['global', '全服 TOP100'],
                   ['friends', '好友榜'],
@@ -37,7 +37,7 @@ export default function Rank() {
                     onClick={() => dispatch(setRankTab(key))}
                     className={[
                       'rounded px-4 py-2 text-sm font-black transition',
-                      activeTab === key ? 'bg-white text-zinc-950' : 'text-zinc-400 hover:text-white',
+                      activeTab === key ? 'gold-button' : 'text-yellow-100/62 hover:text-yellow-100',
                     ].join(' ')}
                   >
                     {label}
@@ -45,7 +45,7 @@ export default function Rank() {
                 ))}
               </div>
               <input
-                className="min-h-11 rounded border border-white/10 bg-black px-4 text-sm font-bold text-white outline-none focus:border-white"
+                className="min-h-11 rounded border border-yellow-200/15 bg-red-950/70 px-4 text-sm font-bold text-white outline-none focus:border-yellow-200"
                 placeholder="搜尋好友名次"
                 value={searchQuery}
                 onChange={(event) => dispatch(setRankSearchQuery(event.target.value))}

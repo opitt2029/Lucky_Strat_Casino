@@ -25,17 +25,17 @@ export default function SlotMachinePreview({ compact = false, grid, winningCells
   }
 
   return (
-    <section className="rounded border border-white/10 bg-zinc-900 p-4">
+    <section className="luxury-panel rounded p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.3em] text-zinc-500">3x3 Slot</p>
-          <h2 className="mt-1 text-xl font-black text-white">星幣老虎機</h2>
+          <p className="gold-muted text-xs font-black uppercase tracking-[0.3em]">3x3 Slot</p>
+          <h2 className="brand-title mt-1 text-xl font-black">星幣老虎機</h2>
         </div>
         <button
           type="button"
           onClick={spin}
           disabled={spinning}
-          className="rounded bg-white px-4 py-2 text-sm font-black text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
+          className="gold-button rounded px-4 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
         >
           {spinning ? 'SPIN' : 'Spin'}
         </button>
@@ -49,8 +49,8 @@ export default function SlotMachinePreview({ compact = false, grid, winningCells
               <div
                 key={`${rowIndex}-${colIndex}-${symbol}`}
                 className={[
-                  'grid place-items-center overflow-hidden rounded border bg-black text-center font-black text-white shadow-inner transition',
-                  isWinning ? 'animate-win-pulse border-white bg-white text-zinc-950' : 'border-white/10',
+                  'grid place-items-center overflow-hidden rounded border bg-red-950/80 text-center font-black text-yellow-100 shadow-inner transition',
+                  isWinning ? 'animate-win-pulse border-yellow-200 bg-yellow-200 text-red-950' : 'border-yellow-200/15',
                   compact ? 'min-h-20 text-sm' : 'min-h-24 text-2xl sm:min-h-32 sm:text-4xl',
                   spinning ? 'animate-reel-blur' : '',
                 ].join(' ')}
@@ -63,7 +63,7 @@ export default function SlotMachinePreview({ compact = false, grid, winningCells
         )}
       </div>
 
-      <div className={['mt-4 rounded border p-3', spinning ? 'animate-win-pulse border-white bg-white text-zinc-950' : 'border-white/10 bg-black text-zinc-400'].join(' ')}>
+      <div className={['mt-4 rounded border p-3', spinning ? 'animate-win-pulse border-yellow-200 bg-yellow-200 text-red-950' : 'border-yellow-200/15 bg-red-950/70 text-yellow-100/62'].join(' ')}>
         <p className="text-sm font-bold">{spinning ? '轉輪運算中...' : 'Ready: 可由 SPIN API 或模擬服務回填結果。'}</p>
       </div>
     </section>

@@ -94,10 +94,10 @@ export default function Member() {
   return (
     <div className="theme-background min-h-screen text-white" style={getBackgroundStyle('auth')}>
       <header className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
-        <Link to="/" className="font-black tracking-tight">
+        <Link to="/" className="brand-title font-black tracking-tight">
           幸運星幣城
         </Link>
-        <Link to="/" className="rounded border border-white/20 px-4 py-2 text-sm font-black text-white hover:bg-white hover:text-zinc-950">
+        <Link to="/" className="red-gold-button rounded px-4 py-2 text-sm font-black transition">
           回首頁
         </Link>
       </header>
@@ -105,17 +105,17 @@ export default function Member() {
       <main className="mx-auto grid max-w-7xl items-center gap-8 px-4 pb-12 pt-4 sm:px-6 lg:grid-cols-[1fr_520px] lg:px-8">
         <section className="grid gap-6">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.35em] text-zinc-500">Member Access</p>
-            <h1 className="mt-4 max-w-3xl text-4xl font-black tracking-tight sm:text-6xl">會員頁是遊戲入口的門禁</h1>
-            <p className="mt-5 max-w-2xl text-base font-bold leading-8 text-zinc-400">
+            <p className="gold-muted text-xs font-black uppercase tracking-[0.35em]">Member Access</p>
+            <h1 className="brand-title mt-4 max-w-3xl text-4xl font-black tracking-tight sm:text-6xl">會員頁是遊戲入口的門禁</h1>
+            <p className="mt-5 max-w-2xl text-base font-bold leading-8 text-yellow-100/70">
               註冊或登入後，才能進入遊戲大全、各遊戲網頁與賭場商城。測試帳號 test / test1234 已預填，可直接登入檢查流程。
             </p>
           </div>
           <DecorativeAsset assetKey="memberHero" className="min-h-[340px]" />
         </section>
 
-        <section className="rounded border border-white/10 bg-zinc-900 p-6">
-          <div className="grid grid-cols-2 gap-2 rounded bg-black p-1">
+        <section className="luxury-panel rounded p-6">
+          <div className="grid grid-cols-2 gap-2 rounded bg-red-950/70 p-1">
             <button
               type="button"
               onClick={() => {
@@ -124,7 +124,7 @@ export default function Member() {
               }}
               className={[
                 'rounded px-4 py-3 text-sm font-black transition',
-                mode === 'login' ? 'bg-white text-zinc-950' : 'text-zinc-400 hover:text-white',
+                mode === 'login' ? 'gold-button' : 'text-yellow-100/62 hover:text-yellow-100',
               ].join(' ')}
             >
               登入
@@ -137,34 +137,34 @@ export default function Member() {
               }}
               className={[
                 'rounded px-4 py-3 text-sm font-black transition',
-                mode === 'register' ? 'bg-white text-zinc-950' : 'text-zinc-400 hover:text-white',
+                mode === 'register' ? 'gold-button' : 'text-yellow-100/62 hover:text-yellow-100',
               ].join(' ')}
             >
               註冊
             </button>
           </div>
 
-          <p className="mt-6 text-xs font-black uppercase tracking-[0.3em] text-zinc-500">{pageCopy.eyebrow}</p>
-          <h2 className="mt-3 text-2xl font-black">{pageCopy.title}</h2>
+          <p className="gold-muted mt-6 text-xs font-black uppercase tracking-[0.3em]">{pageCopy.eyebrow}</p>
+          <h2 className="brand-title mt-3 text-2xl font-black">{pageCopy.title}</h2>
 
           {mode === 'login' ? (
             <form onSubmit={handleLoginSubmit} className="mt-6 grid gap-4">
-              <label className="grid gap-2 text-sm font-bold text-zinc-300">
+              <label className="grid gap-2 text-sm font-bold text-yellow-100/78">
                 帳號
                 <input
                   name="username"
-                  className="rounded border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-white"
+                  className="rounded border border-yellow-200/15 bg-red-950/70 px-4 py-3 text-white outline-none focus:border-yellow-200"
                   value={loginForm.username}
                   onChange={handleLoginChange}
                   autoComplete="username"
                   required
                 />
               </label>
-              <label className="grid gap-2 text-sm font-bold text-zinc-300">
+              <label className="grid gap-2 text-sm font-bold text-yellow-100/78">
                 密碼
                 <input
                   name="password"
-                  className="rounded border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-white"
+                  className="rounded border border-yellow-200/15 bg-red-950/70 px-4 py-3 text-white outline-none focus:border-yellow-200"
                   value={loginForm.password}
                   onChange={handleLoginChange}
                   type="password"
@@ -176,18 +176,18 @@ export default function Member() {
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-2 rounded bg-white px-5 py-3 text-sm font-black text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
+                className="gold-button mt-2 rounded px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? '登入中...' : pageCopy.submit}
               </button>
             </form>
           ) : (
             <form onSubmit={handleRegisterSubmit} className="mt-6 grid gap-4">
-              <label className="grid gap-2 text-sm font-bold text-zinc-300">
+              <label className="grid gap-2 text-sm font-bold text-yellow-100/78">
                 帳號
                 <input
                   name="username"
-                  className="rounded border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-white"
+                  className="rounded border border-yellow-200/15 bg-red-950/70 px-4 py-3 text-white outline-none focus:border-yellow-200"
                   placeholder="lucky-player"
                   value={registerForm.username}
                   onChange={handleRegisterChange}
@@ -195,11 +195,11 @@ export default function Member() {
                   required
                 />
               </label>
-              <label className="grid gap-2 text-sm font-bold text-zinc-300">
+              <label className="grid gap-2 text-sm font-bold text-yellow-100/78">
                 暱稱
                 <input
                   name="nickname"
-                  className="rounded border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-white"
+                  className="rounded border border-yellow-200/15 bg-red-950/70 px-4 py-3 text-white outline-none focus:border-yellow-200"
                   placeholder="Lucky Player"
                   value={registerForm.nickname}
                   onChange={handleRegisterChange}
@@ -207,11 +207,11 @@ export default function Member() {
                   required
                 />
               </label>
-              <label className="grid gap-2 text-sm font-bold text-zinc-300">
+              <label className="grid gap-2 text-sm font-bold text-yellow-100/78">
                 Email
                 <input
                   name="email"
-                  className="rounded border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-white"
+                  className="rounded border border-yellow-200/15 bg-red-950/70 px-4 py-3 text-white outline-none focus:border-yellow-200"
                   placeholder="player@example.com"
                   value={registerForm.email}
                   onChange={handleRegisterChange}
@@ -219,11 +219,11 @@ export default function Member() {
                   required
                 />
               </label>
-              <label className="grid gap-2 text-sm font-bold text-zinc-300">
+              <label className="grid gap-2 text-sm font-bold text-yellow-100/78">
                 密碼
                 <input
                   name="password"
-                  className="rounded border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-white"
+                  className="rounded border border-yellow-200/15 bg-red-950/70 px-4 py-3 text-white outline-none focus:border-yellow-200"
                   value={registerForm.password}
                   onChange={handleRegisterChange}
                   type="password"
@@ -237,14 +237,14 @@ export default function Member() {
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-2 rounded bg-white px-5 py-3 text-sm font-black text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
+                className="gold-button mt-2 rounded px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? '建立中...' : pageCopy.submit}
               </button>
             </form>
           )}
 
-          <button type="button" onClick={switchMode} className="mt-5 w-full text-center text-sm font-bold text-zinc-400 transition hover:text-white">
+          <button type="button" onClick={switchMode} className="gold-muted mt-5 w-full text-center text-sm font-bold transition hover:text-yellow-100">
             {pageCopy.switchText}
           </button>
         </section>
