@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import AppShell from '../components/AppShell'
 import LeaderboardPanel from '../components/LeaderboardPanel'
@@ -7,6 +7,7 @@ import { fetchRanks, setRankSearchQuery, setRankTab } from '../store/slices/rank
 
 export default function Rank() {
   const dispatch = useDispatch()
+  const [showFullRank, setShowFullRank] = useState(false)
   const { globalRank, friendRank, myGlobalRank, activeTab, searchQuery, loading, error } = useSelector((state) => state.rank)
   const player = useSelector((state) => state.auth.player)
   const rows = activeTab === 'friends' ? friendRank : globalRank
@@ -15,10 +16,16 @@ export default function Rank() {
     [rows, searchQuery]
   )
   const topScore = globalRank[0]?.score || 0
+  const rankLimit = showFullRank ? 100 : 20
+  const canShowMore = filteredRows.length > rankLimit
 
   useEffect(() => {
     dispatch(fetchRanks())
   }, [dispatch])
+
+  useEffect(() => {
+    setShowFullRank(false)
+  }, [activeTab, searchQuery])
 
   return (
     <AppShell>
@@ -53,7 +60,16 @@ export default function Rank() {
             </div>
             {error && <p className="mt-3 rounded border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200">{error}</p>}
           </section>
-          <LeaderboardPanel rows={filteredRows} myNickname={player?.nickname} limit={100} />
+          <LeaderboardPanel rows={filteredRows} myNickname={player?.nickname} limit={rankLimit} />
+          {canShowMore && (
+            <button
+              type="button"
+              onClick={() => setShowFullRank(true)}
+              className="gold-button justify-self-center rounded px-6 py-3 text-sm font-black transition"
+            >
+              顯示更多
+            </button>
+          )}
         </div>
         <aside className="grid gap-4 content-start">
           <MetricCard label="榜首分數" value={topScore.toLocaleString()} caption="rankSlice.globalRank" tone="light" />

@@ -13,9 +13,68 @@ const sections = [
 
 const clamp = (value, min = 0, max = 1) => Math.min(Math.max(value, min), max)
 
+function UserProfileChip({ player, onClick }) {
+  const [avatarFailed, setAvatarFailed] = useState(false)
+  const memberLabel = player?.nickname || player?.username || '會員中心'
+  const fallbackInitial = memberLabel.slice(0, 1).toUpperCase()
+  const canShowAvatar = player?.avatarUrl && !avatarFailed
+
+  return (
+    <Link
+      to="/profile"
+      onClick={onClick}
+      className="luxury-panel-soft flex max-w-[220px] shrink-0 items-center gap-2 rounded px-3 py-2 transition hover:border-yellow-200/50"
+      aria-label={`前往 ${memberLabel} 的會員中心`}
+    >
+      <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full border border-yellow-200/30 bg-red-950/80 text-sm font-black text-yellow-100">
+        {canShowAvatar ? (
+          <img
+            src={player.avatarUrl}
+            alt=""
+            className="h-full w-full object-cover"
+            onError={() => setAvatarFailed(true)}
+          />
+        ) : (
+          fallbackInitial
+        )}
+      </span>
+      <span className="min-w-0">
+        <span className="gold-muted block text-[10px] font-black uppercase">Player</span>
+        <span className="block truncate text-sm font-black text-yellow-100">{memberLabel}</span>
+      </span>
+    </Link>
+  )
+}
+
+function GuestProfileChip({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="luxury-panel-soft flex max-w-[220px] shrink-0 items-center gap-2 rounded px-3 py-2 text-left transition hover:border-red-300/70"
+      aria-label="未登入，點擊顯示登入提示"
+    >
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-red-300/40 bg-red-950/80 text-sm font-black text-red-200">
+        ?
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[10px] font-black uppercase text-red-200/70">Guest</span>
+        <span className="block truncate text-sm font-black text-red-100">未登入</span>
+      </span>
+    </button>
+  )
+}
+
 function HomeHeader({ scrolled, progress }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated)
+  const [guestNoticeOpen, setGuestNoticeOpen] = useState(false)
+  const { isAuthenticated, player } = useSelector((state) => state.auth)
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setGuestNoticeOpen(false)
+    }
+  }, [isAuthenticated])
 
   return (
     <header
@@ -42,6 +101,16 @@ function HomeHeader({ scrolled, progress }) {
           >
             {isAuthenticated ? '進入遊戲大全' : '會員登入'}
           </Link>
+          {isAuthenticated ? (
+            <UserProfileChip player={player} />
+          ) : (
+            <>
+              <GuestProfileChip onClick={() => setGuestNoticeOpen(true)} />
+              {guestNoticeOpen && (
+                <span className="shrink-0 text-xs font-black text-red-300">請先登入</span>
+              )}
+            </>
+          )}
         </nav>
 
         <div className="relative md:hidden">
@@ -71,20 +140,33 @@ function HomeHeader({ scrolled, progress }) {
                   {section.label}
                 </a>
               ))}
-              <Link
-                to="/member"
-                className="gold-button mt-2 block rounded px-3 py-2 text-sm font-black"
-                onClick={() => setMenuOpen(false)}
-              >
-                會員登入 / 註冊
-              </Link>
-              {isAuthenticated && (
+              {isAuthenticated ? (
+                <UserProfileChip player={player} onClick={() => setMenuOpen(false)} />
+              ) : (
+                <>
+                  <GuestProfileChip onClick={() => setGuestNoticeOpen(true)} />
+                  {guestNoticeOpen && (
+                    <p className="mt-2 rounded px-3 py-2 text-sm font-black text-red-300">
+                      請先登入
+                    </p>
+                  )}
+                </>
+              )}
+              {isAuthenticated ? (
                 <Link
                   to="/profile"
                   className="red-gold-button mt-2 block rounded px-3 py-2 text-sm font-black"
                   onClick={() => setMenuOpen(false)}
                 >
                   會員中心
+                </Link>
+              ) : (
+                <Link
+                  to="/member"
+                  className="gold-button mt-2 block rounded px-3 py-2 text-sm font-black"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  會員登入 / 註冊
                 </Link>
               )}
             </div>

@@ -1,24 +1,41 @@
 import { useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
 import AppShell from '../components/AppShell'
-import DecorativeAsset from '../components/DecorativeAsset'
 import MetricCard from '../components/MetricCard'
 import { gameCatalog, getBackgroundStyle, getDecorativeAssetStyle } from '../theme/backgroundTheme'
 
-function GameCard({ game }) {
+function GameCard({ game, index }) {
+  const hoverTone =
+    index % 2 === 0
+      ? 'hover:shadow-[0_28px_80px_rgba(248,213,106,0.18)] hover:[transform:translateY(-6px)_scale(1.01)]'
+      : 'hover:shadow-[0_28px_80px_rgba(201,13,24,0.24)] hover:[transform:translateY(-4px)_rotate(-0.5deg)]'
+
   return (
     <Link
       to={game.to}
-      className="luxury-panel-soft group grid overflow-hidden rounded transition hover:border-yellow-200/70 md:grid-cols-[0.44fr_0.56fr]"
+      className={[
+        'luxury-panel-soft group relative grid min-h-[360px] overflow-hidden rounded transition-all duration-500 md:grid-cols-[0.56fr_0.44fr]',
+        'hover:border-yellow-200/80 hover:bg-red-800/80',
+        hoverTone,
+      ].join(' ')}
     >
-      <div className="decorative-asset min-h-52" style={getDecorativeAssetStyle(game.assetKey)} />
-      <div className="grid content-between p-5">
+      <div
+        className="decorative-asset min-h-64 transition duration-700 group-hover:scale-105 group-hover:saturate-125"
+        style={getDecorativeAssetStyle(game.assetKey)}
+      />
+      <div className="relative grid content-between overflow-hidden p-6 sm:p-8">
+        <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-yellow-200/70 to-transparent opacity-0 transition duration-500 group-hover:opacity-100" />
         <div>
           <p className="gold-muted text-xs font-black uppercase tracking-[0.25em]">{game.meta}</p>
-          <h3 className="brand-title mt-3 text-3xl font-black">{game.title}</h3>
-          <p className="mt-3 text-sm font-bold leading-6 text-yellow-100/64">{game.caption}</p>
+          <h3 className="brand-title mt-4 text-4xl font-black sm:text-5xl">{game.title}</h3>
+          <p className="mt-4 max-w-xl text-base font-bold leading-7 text-yellow-100/68">{game.caption}</p>
         </div>
-        <span className="mt-6 text-sm font-black">查看遊戲頁</span>
+        <span className="mt-8 inline-flex w-fit items-center gap-2 text-sm font-black text-yellow-100 transition duration-500 group-hover:translate-x-2 group-hover:text-yellow-200">
+          進入遊戲
+          <span className="grid h-8 w-8 place-items-center rounded-full border border-yellow-200/30 bg-red-950/70 transition group-hover:border-yellow-200 group-hover:bg-yellow-200 group-hover:text-red-950">
+            →
+          </span>
+        </span>
       </div>
     </Link>
   )
@@ -52,19 +69,15 @@ export default function Lobby() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
-          <MetricCard label="目前星幣" value={balance.toLocaleString()} caption="walletSlice.balance" tone="light" />
+          <MetricCard label="目前星幣" value={balance.toLocaleString()} caption="您目前的籌碼總數" tone="light" />
           <MetricCard label="收錄遊戲" value={gameCatalog.length.toString()} caption="遊戲大全展示數" />
-          <MetricCard label="頁面定位" value="Catalog" caption="不在大廳直接遊玩" />
         </div>
       </section>
 
-      <section className="mt-6 grid gap-4 lg:grid-cols-[0.32fr_1fr]">
-        <DecorativeAsset assetKey="gamesGallery" className="min-h-64" />
-        <div className="grid gap-4 md:grid-cols-2">
-          {gameCatalog.map((game) => (
-            <GameCard key={game.to} game={game} />
-          ))}
-        </div>
+      <section className="mt-6 grid gap-5 xl:grid-cols-2">
+        {gameCatalog.map((game, index) => (
+          <GameCard key={game.to} game={game} index={index} />
+        ))}
       </section>
     </AppShell>
   )

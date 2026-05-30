@@ -26,9 +26,6 @@ export default function AppShell({ children }) {
   const [isScrolled, setIsScrolled] = useState(false)
   const player = useSelector((state) => state.auth.player)
   const balance = useSelector((state) => state.wallet.balance)
-  const status = useSelector((state) => state.game.status)
-  const connectionStatus = useSelector((state) => state.game.connectionStatus)
-  const reconnectAttempt = useSelector((state) => state.game.reconnectAttempt)
   const notifications = useSelector((state) => state.game.notifications)
 
   useEffect(() => {
@@ -79,17 +76,6 @@ export default function AppShell({ children }) {
               <div className="luxury-panel-soft rounded px-4 py-2">
                 <span className="gold-muted block text-[11px] font-bold uppercase">籌碼</span>
                 <span className="font-black">{balance.toLocaleString()}</span>
-              </div>
-              <div className="luxury-panel-soft rounded px-4 py-2">
-                <span className="gold-muted block text-[11px] font-bold uppercase">狀態</span>
-                <span className="font-black">{status}</span>
-              </div>
-              <div className="luxury-panel-soft rounded px-4 py-2">
-                <span className="gold-muted block text-[11px] font-bold uppercase">WS</span>
-                <span className="font-black">
-                  {connectionStatus}
-                  {reconnectAttempt ? ` #${reconnectAttempt}` : ''}
-                </span>
               </div>
               <div className="relative">
                 <button

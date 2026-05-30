@@ -235,7 +235,6 @@ export default function Profile() {
           <MetricCard
             label="可用籌碼"
             value={wallet.balance.toLocaleString()}
-            caption="walletSlice.balance"
             tone="light"
           />
           <MetricCard

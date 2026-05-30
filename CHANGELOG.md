@@ -5,6 +5,86 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [changed] — 2026-05-30 — 遊戲大全入口卡片放大
+
+### Changed
+- `frontend/src/pages/Lobby.jsx`：移除 `/games` 頁面遊戲列表左側的 `gamesGallery` 裝飾視覺區塊，讓遊戲入口卡片直接佔滿 main 內容寬度。
+- 放大遊戲入口 `Link` 卡片尺寸，改為更寬的主入口版型，並加入 hover 位移、縮放、光線、陰影、圖片飽和度與 CTA 箭頭互動效果；不同卡片使用不同 hover 動態。
+
+### Why
+- 使用者指定刪除「遊戲大全視覺」裝飾 div，並希望遊戲入口 a tag 更大、更符合 main 區塊尺度，互動時有更明顯的 hover 回饋。
+
+### How（如何驗證）
+- `npm run lint`（frontend）→ PASS。
+- `npm run build`（frontend）→ PASS（sandbox 內 esbuild 讀取 `vite.config.js` 會遇到 Windows `Access is denied`，升權重跑後成功）。
+
+---
+
+## [changed] — 2026-05-30 — 排行榜預設顯示 20 名
+
+### Changed
+- `frontend/src/pages/Rank.jsx`：排行榜預設只顯示前 20 名，列表下方新增「顯示更多」按鈕；點擊後展開至完整 100 名玩家。
+- 切換全服/好友榜或變更搜尋關鍵字時，排行榜顯示數量會重置為前 20 名，避免篩選後仍維持展開狀態。
+
+### Why
+- 排行榜初始顯示 100 名資訊量過大；預設顯示 20 名更容易掃讀，需要時再展開完整 TOP100。
+
+### How（如何驗證）
+- `npm run lint`（frontend）→ PASS。
+- `npm run build`（frontend）→ PASS（sandbox 內 esbuild 讀取 `vite.config.js` 會遇到 Windows `Access is denied`，升權重跑後成功）。
+
+---
+
+## [changed] — 2026-05-30 — 移除登入後頁面 Header 技術狀態
+
+### Changed
+- `frontend/src/components/AppShell.jsx`：移除 header 內「狀態」與「WS」兩個技術資訊區塊，保留玩家、籌碼、通知中心與登出。
+- 同步移除 `state.game.status`、`connectionStatus`、`reconnectAttempt` 的 header selector，避免 UI 仍依賴這些除錯用欄位。
+
+### Why
+- 一般使用者不需要看到遊戲狀態字串或 WebSocket 連線狀態；移除後登入後頁面的 header 更簡潔，聚焦在玩家資訊與操作入口。
+
+### How（如何驗證）
+- `npm run lint`（frontend）→ PASS。
+- `npm run build`（frontend）→ PASS（sandbox 內 esbuild 讀取 `vite.config.js` 會遇到 Windows `Access is denied`，升權重跑後成功）。
+
+---
+
+## [changed] — 2026-05-30 — 首頁登入狀態顯示頭像與暱稱
+
+### Changed
+- `frontend/src/pages/Home.jsx`：首頁右上角保留原本 CTA（登入後仍顯示「進入遊戲大全」並導向 `/games`；未登入顯示「會員登入」並導向 `/member`），登入狀態時在按鈕旁新增頭像 + 暱稱的會員入口，點擊導向 `/profile`。
+- 未登入狀態時，頭像/暱稱位置顯示「未登入」chip；點擊後在旁邊/選單內顯示紅字「請先登入」，不自動跳頁。
+- 手機首頁選單同步顯示登入頭像 + 暱稱或未登入 chip，並保留原本「會員中心」/「會員登入 / 註冊」入口。
+
+### Why
+- 使用者希望保留首頁原本按鈕配置，同時在按鈕旁顯示目前會員狀態：登入時顯示設定頭像與暱稱並可直達會員中心，未登入時顯示「未登入」並以紅字提示需先登入。
+
+### How（如何驗證）
+- `npm run lint`（frontend）→ PASS。
+- `npm run build`（frontend）→ PASS（sandbox 內 esbuild 讀取 `vite.config.js` 會遇到 Windows `Access is denied`，升權重跑後成功）。
+
+---
+
+## [feat] — 2026-05-30 — 前端站內連結過場動畫
+
+### Added
+- `frontend/src/components/PageTransition.jsx`（新增）：監聽站內 `<a>` 點擊與 React Router `pathname` 變化，對 `Link`、`NavLink`、錨點連結與程式導頁觸發 720ms 以內的全域過場。
+- `frontend/src/index.css`：新增 `page-enter` 與 `link-sheen` 動畫，讓頁面切換淡入上移、連結點擊時有金紅掃光效果；支援 `prefers-reduced-motion: reduce` 關閉動畫。
+
+### Changed
+- `frontend/src/App.jsx`：在 `BrowserRouter` 內包覆 `PageTransition`，集中處理所有 route 頁面切換，不需逐一修改既有頁面連結。
+
+### Why
+- 使用者要求每個 link 點擊後都能在 1 秒內有過場動畫，提升 React 前端頁面切換的絲滑感。
+- 採全域元件攔截站內連結與 route 變化，可以涵蓋首頁錨點、導覽列、卡片連結與登入後 `navigate()`，同時避免散落在每個頁面重複實作。
+
+### How（如何驗證）
+- `npm run lint`（frontend）→ PASS。
+- `npm run build`（frontend）→ PASS（sandbox 內 esbuild 讀取 `vite.config.js` 遇到 Windows `Access is denied`，升權重跑後成功）。
+
+---
+
 ## [feat] — 2026-05-29 — Kafka→MySQL 讀端同步（補 T-025 流水查詢資料來源）
 
 ### Added

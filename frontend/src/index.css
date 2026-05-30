@@ -48,6 +48,29 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+.page-transition-stage {
+  min-height: 100vh;
+  animation: page-enter 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: opacity, transform, filter;
+}
+
+.page-transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    linear-gradient(115deg, transparent 0%, rgba(255, 234, 160, 0.18) 35%, rgba(255, 234, 160, 0.52) 50%, rgba(201, 13, 24, 0.18) 66%, transparent 100%),
+    radial-gradient(circle at 50% 50%, rgba(255, 234, 160, 0.22), transparent 34%);
+  transform: translate3d(-24%, 0, 0) scaleX(1.18);
+  mix-blend-mode: screen;
+}
+
+.page-transition-overlay[data-active] {
+  animation: link-sheen 0.72s cubic-bezier(0.2, 0.85, 0.28, 1) both;
+}
+
 .theme-background,
 .theme-artwork {
   background-color: var(--theme-bg-color, #09090b);
@@ -229,6 +252,33 @@ a {
   box-shadow: 0 16px 48px rgba(47, 0, 4, 0.36);
 }
 
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0) scale(0.992);
+    filter: blur(8px) saturate(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0) saturate(1);
+  }
+}
+
+@keyframes link-sheen {
+  0% {
+    opacity: 0;
+    transform: translate3d(-30%, 0, 0) scaleX(1.2);
+  }
+  24% {
+    opacity: 0.82;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(30%, 0, 0) scaleX(1.08);
+  }
+}
+
 @keyframes section-reveal {
   from {
     opacity: 0.56;
@@ -291,4 +341,11 @@ a {
 .animate-card-flip {
   animation: card-flip 0.36s ease-out both;
   transform-style: preserve-3d;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition-stage,
+  .page-transition-overlay[data-active] {
+    animation: none;
+  }
 }
